@@ -2,11 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
+<meta name="theme-color" content="#3b82f6"/>
+<meta name="description" content="TravelMate — Plan trips, split expenses, travel happy"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="TravelMate"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="logo.png"/>
+<link rel="icon" type="image/png" href="logo.png"/>
 <title>TravelMate ✈️</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800;900&family=Pacifico&display=swap" rel="stylesheet">
-<!-- jsPDF for PDF export -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <style>
@@ -23,24 +30,30 @@
   --yellow:#d97706;--yellow-light:#fffbeb;
   --text:#1e293b;--muted:#64748b;--light:#f8fafc;
   --shadow:0 4px 24px rgba(59,130,246,0.10);
-  --shadow-lg:0 12px 48px rgba(59,130,246,0.15);
+  --shadow-lg:0 12px 48px rgba(59,130,246,0.18);
   --r:14px;
+  --font:'Nunito',sans-serif;
+  --font-display:'Pacifico',cursive;
+  --safe-bottom:env(safe-area-inset-bottom,0px);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-html{scroll-behavior:smooth;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
 body{
-  font-family:'Nunito',sans-serif;background:var(--bg);
-  color:var(--text);min-height:100vh;overflow-x:hidden;
+  font-family:var(--font);
+  background:var(--bg);color:var(--text);
+  min-height:100vh;overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
 }
+
 /* ═══════════════════════════════════════
-   SKY ANIMATION
+   SKY ANIMATION (hidden on small screens)
 ═══════════════════════════════════════ */
 .sky-deco{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
-.cloud-anim{position:absolute;opacity:0.5;}
-.cloud-anim svg{filter:drop-shadow(0 3px 6px rgba(59,130,246,0.08));}
-.c1{top:6%; animation:cfl 40s linear infinite;}
+@media(max-width:600px){.sky-deco{display:none;}}
+.cloud-anim{position:absolute;opacity:0.45;}
+.c1{top:6%;animation:cfl 40s linear infinite;}
 .c2{top:16%;animation:cfr 55s linear infinite;}
-.c3{top:4%; animation:cfl 48s linear infinite;animation-delay:-20s;}
+.c3{top:4%;animation:cfl 48s linear infinite;animation-delay:-20s;}
 @keyframes cfl{from{left:-200px}to{left:110vw}}
 @keyframes cfr{from{left:110vw}to{left:-200px}}
 .bird-flock{position:absolute;animation:bfly 24s linear infinite;}
@@ -54,227 +67,302 @@ body{
 .bird-svg:nth-child(2){animation-delay:0.1s;}
 .bird-svg:nth-child(3){animation-delay:0.2s;}
 @keyframes flap{from{transform:scaleY(1);}to{transform:scaleY(0.3);}}
+
 /* ═══════════════════════════════════════
-   SCREENS CONTROLLER
+   SCREENS
 ═══════════════════════════════════════ */
 .screen{display:none;position:relative;z-index:10;min-height:100vh;}
 .screen.active{display:block;}
+
 /* ═══════════════════════════════════════
    TOP NAV
 ═══════════════════════════════════════ */
 .topnav{
   display:flex;align-items:center;justify-content:space-between;
-  padding:14px 28px;background:rgba(255,255,255,0.9);
+  padding:12px 20px;background:rgba(255,255,255,0.95);
   backdrop-filter:blur(12px);border-bottom:1.5px solid var(--border);
-  position:sticky;top:0;z-index:100;
+  position:sticky;top:0;z-index:100;gap:10px;
 }
-.topnav .logo{font-family:'Pacifico',cursive;font-size:1.5rem;
+.topnav .logo{
+  font-family:var(--font-display);font-size:1.3rem;
   background:linear-gradient(135deg,var(--blue),var(--orange));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
-.topnav .nav-right{display:flex;align-items:center;gap:12px;}
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  white-space:nowrap;
+  display:flex;align-items:center;gap:6px;
+}
+.topnav .logo img{width:28px;height:28px;border-radius:6px;object-fit:cover;}
+.topnav .nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .user-chip{
-  display:flex;align-items:center;gap:8px;
+  display:flex;align-items:center;gap:6px;
   background:var(--blue-light);border:1.5px solid var(--border);
-  border-radius:30px;padding:5px 14px 5px 6px;
+  border-radius:30px;padding:4px 10px 4px 5px;
 }
 .user-chip .av{
-  width:28px;height:28px;border-radius:50%;
+  width:26px;height:26px;border-radius:50%;
   background:linear-gradient(135deg,var(--blue),var(--pink));
-  color:#fff;font-size:0.7rem;font-weight:900;
+  color:#fff;font-size:0.65rem;font-weight:900;
   display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
 }
-.user-chip .uname{font-size:0.8rem;font-weight:800;color:var(--blue2);}
-.user-chip .role-badge{
-  font-size:0.65rem;font-weight:800;padding:2px 7px;border-radius:10px;
-}
+.user-chip .uname{font-size:0.78rem;font-weight:800;color:var(--blue2);
+  max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+@media(max-width:400px){.user-chip .uname{max-width:60px;}}
+.role-badge{font-size:0.6rem;font-weight:800;padding:2px 6px;border-radius:10px;}
 .rb-admin{background:var(--yellow-light);color:var(--yellow);}
 .rb-organiser{background:var(--blue-light);color:var(--blue2);}
 .rb-traveller{background:var(--green-light);color:var(--green);}
+
 /* ═══════════════════════════════════════
    MAIN CONTAINER
 ═══════════════════════════════════════ */
-.main-wrap{max-width:1100px;margin:0 auto;padding:28px 18px 80px;}
+.main-wrap{
+  max-width:1100px;margin:0 auto;
+  padding:22px 16px calc(80px + var(--safe-bottom));
+}
+@media(max-width:600px){.main-wrap{padding:14px 12px calc(70px + var(--safe-bottom));}}
+
+/* ═══════════════════════════════════════
+   BOTTOM NAV (mobile only)
+═══════════════════════════════════════ */
+.bottom-nav{
+  display:none;
+  position:fixed;bottom:0;left:0;right:0;z-index:200;
+  background:rgba(255,255,255,0.97);
+  border-top:1.5px solid var(--border);
+  padding:8px 0 calc(8px + var(--safe-bottom));
+  justify-content:space-around;align-items:center;
+  backdrop-filter:blur(12px);
+}
+@media(max-width:768px){.bottom-nav{display:flex;}}
+.bn-item{
+  display:flex;flex-direction:column;align-items:center;
+  gap:2px;cursor:pointer;padding:6px 16px;
+  border-radius:12px;transition:background 0.2s;
+  min-width:60px;
+}
+.bn-item:hover,.bn-item.active{background:var(--blue-light);}
+.bn-item .bn-icon{font-size:1.3rem;line-height:1;}
+.bn-item .bn-label{font-size:0.65rem;font-weight:800;color:var(--muted);}
+.bn-item.active .bn-label{color:var(--blue2);}
+
 /* ═══════════════════════════════════════
    CARDS
 ═══════════════════════════════════════ */
 .card{
   background:var(--card);border:1.5px solid var(--border);
-  border-radius:var(--r);box-shadow:var(--shadow);padding:26px;
-  margin-bottom:20px;transition:box-shadow 0.2s;
+  border-radius:var(--r);box-shadow:var(--shadow);padding:22px;
+  margin-bottom:16px;transition:box-shadow 0.2s;
 }
+@media(max-width:600px){.card{padding:16px;border-radius:12px;}}
 .card:hover{box-shadow:var(--shadow-lg);}
 .card-title{
-  font-size:1.05rem;font-weight:800;color:var(--text);
-  margin-bottom:18px;display:flex;align-items:center;gap:8px;
+  font-size:1rem;font-weight:800;color:var(--text);
+  margin-bottom:16px;display:flex;align-items:center;gap:8px;
 }
+
 /* ═══════════════════════════════════════
    FORMS
 ═══════════════════════════════════════ */
-.form-row{margin-bottom:15px;}
+.form-row{margin-bottom:14px;}
 .form-row label{
-  display:block;font-size:0.72rem;font-weight:800;
-  color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:5px;
+  display:block;font-size:0.7rem;font-weight:800;
+  color:var(--muted);text-transform:uppercase;
+  letter-spacing:0.8px;margin-bottom:5px;
+  font-family:var(--font);
 }
 .form-row input,.form-row select,.form-row textarea{
   width:100%;background:var(--light);border:1.5px solid var(--border);
   border-radius:10px;color:var(--text);
-  font-family:'Nunito',sans-serif;font-size:0.93rem;font-weight:600;
-  padding:11px 14px;outline:none;transition:border-color 0.2s,box-shadow 0.2s;
+  font-family:var(--font);font-size:1rem;font-weight:600;
+  padding:12px 14px;outline:none;
+  transition:border-color 0.2s,box-shadow 0.2s;
+  -webkit-appearance:none;appearance:none;
+}
+.form-row select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center;
+  padding-right:36px;
 }
 .form-row input:focus,.form-row select:focus,.form-row textarea:focus{
   border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,0.12);}
 .form-row textarea{resize:vertical;min-height:70px;}
-.form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:480px){.form-grid-2{grid-template-columns:1fr;gap:0;}}
+
 /* ═══════════════════════════════════════
    BUTTONS
 ═══════════════════════════════════════ */
 .btn{
   border:none;border-radius:10px;cursor:pointer;
-  font-family:'Nunito',sans-serif;font-weight:800;font-size:0.9rem;
-  padding:10px 20px;display:inline-flex;align-items:center;
+  font-family:var(--font);font-weight:800;font-size:0.9rem;
+  padding:11px 20px;display:inline-flex;align-items:center;
   justify-content:center;gap:7px;transition:all 0.2s;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
 }
 .btn-blue{background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;
   box-shadow:0 3px 14px rgba(59,130,246,0.3);}
-.btn-blue:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(59,130,246,0.4);}
+.btn-blue:hover,.btn-blue:active{transform:translateY(-1px);box-shadow:0 6px 22px rgba(59,130,246,0.4);}
 .btn-orange{background:linear-gradient(135deg,var(--orange),#ea580c);color:#fff;
   box-shadow:0 3px 14px rgba(249,115,22,0.3);}
-.btn-orange:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(249,115,22,0.4);}
+.btn-orange:hover,.btn-orange:active{transform:translateY(-1px);}
 .btn-pink{background:linear-gradient(135deg,var(--pink),#be185d);color:#fff;
   box-shadow:0 3px 14px rgba(236,72,153,0.3);}
-.btn-pink:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(236,72,153,0.4);}
+.btn-pink:hover,.btn-pink:active{transform:translateY(-1px);}
 .btn-green{background:linear-gradient(135deg,#22c55e,var(--green));color:#fff;
   box-shadow:0 3px 14px rgba(34,197,94,0.3);}
-.btn-green:hover{transform:translateY(-2px);}
 .btn-red{background:linear-gradient(135deg,#ef4444,var(--red));color:#fff;
   box-shadow:0 3px 14px rgba(220,38,38,0.3);}
-.btn-red:hover{transform:translateY(-2px);}
 .btn-ghost{background:transparent;border:1.5px solid var(--border);color:var(--muted);}
 .btn-ghost:hover{border-color:var(--blue);color:var(--blue);}
-.btn-sm{padding:7px 14px;font-size:0.8rem;}
-.btn-xs{padding:5px 10px;font-size:0.75rem;}
-.btn-full{width:100%;padding:13px;}
+.btn-sm{padding:7px 14px;font-size:0.78rem;}
+.btn-xs{padding:5px 10px;font-size:0.72rem;}
+.btn-full{width:100%;padding:14px;}
 .btn:disabled{opacity:0.5;cursor:not-allowed;transform:none!important;}
+
 /* ═══════════════════════════════════════
-   BADGES / PILLS
+   BADGES
 ═══════════════════════════════════════ */
-.badge{border-radius:20px;padding:3px 10px;font-size:0.72rem;font-weight:800;}
+.badge{border-radius:20px;padding:3px 9px;font-size:0.7rem;font-weight:800;font-family:var(--font);}
 .badge-blue{background:var(--blue-light);color:var(--blue2);}
 .badge-orange{background:var(--orange-light);color:#c2410c;}
 .badge-pink{background:var(--pink-light);color:#9d174d;}
 .badge-green{background:var(--green-light);color:var(--green);}
 .badge-red{background:var(--red-light);color:var(--red);}
 .badge-yellow{background:var(--yellow-light);color:var(--yellow);}
+
 /* ═══════════════════════════════════════
    TABLES
 ═══════════════════════════════════════ */
-.tbl-wrap{overflow-x:auto;}
-table.dtbl{width:100%;border-collapse:collapse;}
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+table.dtbl{width:100%;border-collapse:collapse;min-width:500px;}
 table.dtbl th{
-  text-align:left;font-size:0.7rem;font-weight:800;
+  text-align:left;font-size:0.68rem;font-weight:800;
   color:var(--muted);text-transform:uppercase;letter-spacing:0.7px;
   padding:9px 12px;border-bottom:2px solid var(--border);
-  background:var(--light);
+  background:var(--light);font-family:var(--font);
 }
 table.dtbl td{
-  padding:12px 12px;border-bottom:1px solid var(--border);
-  font-size:0.88rem;font-weight:600;vertical-align:middle;
+  padding:11px 12px;border-bottom:1px solid var(--border);
+  font-size:0.87rem;font-weight:600;vertical-align:middle;
+  font-family:var(--font);
 }
 table.dtbl tr:last-child td{border-bottom:none;}
 table.dtbl tr:hover td{background:var(--blue-light);}
+
 /* ═══════════════════════════════════════
    STAT BOXES
 ═══════════════════════════════════════ */
-.stats-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;margin-bottom:22px;}
+.stats-row{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(130px,1fr));
+  gap:12px;margin-bottom:18px;
+}
+@media(max-width:400px){.stats-row{grid-template-columns:1fr 1fr;}}
 .stat-box{
   background:var(--card);border:1.5px solid var(--border);
-  border-radius:var(--r);padding:18px;text-align:center;
-  box-shadow:var(--shadow);transition:transform 0.2s;
+  border-radius:12px;padding:14px;text-align:center;
+  box-shadow:var(--shadow);
 }
-.stat-box:hover{transform:translateY(-2px);}
-.stat-box .sv{font-size:1.5rem;font-weight:900;}
-.stat-box .sl{font-size:0.7rem;color:var(--muted);font-weight:700;
-  margin-top:4px;text-transform:uppercase;letter-spacing:0.5px;}
+.stat-box .sv{font-size:1.35rem;font-weight:900;font-family:var(--font);}
+.stat-box .sl{font-size:0.65rem;color:var(--muted);font-weight:800;
+  margin-top:3px;text-transform:uppercase;letter-spacing:0.5px;font-family:var(--font);}
+
 /* ═══════════════════════════════════════
    LOGIN SCREEN
 ═══════════════════════════════════════ */
 #screen-login{
-  background:linear-gradient(160deg,#dbeafe 0%,#fef3c7 50%,#fce7f3 100%);
   display:flex;align-items:center;justify-content:center;
-  padding:20px;min-height:100vh;
+  min-height:100vh;padding:20px;
+  background:linear-gradient(160deg,#dbeafe 0%,#fef3c7 50%,#fce7f3 100%);
 }
 .login-box{
-  background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);
+  background:rgba(255,255,255,0.95);backdrop-filter:blur(16px);
   border:1.5px solid rgba(255,255,255,0.8);border-radius:24px;
-  width:100%;max-width:420px;padding:40px 36px;
+  width:100%;max-width:420px;padding:36px 30px;
   box-shadow:0 20px 60px rgba(59,130,246,0.15);
   animation:slideUp 0.4s ease;
 }
+@media(max-width:480px){.login-box{padding:28px 20px;border-radius:20px;}}
 @keyframes slideUp{from{transform:translateY(30px);opacity:0;}to{transform:translateY(0);opacity:1;}}
-.login-logo{text-align:center;margin-bottom:28px;}
-.login-logo h1{font-family:'Pacifico',cursive;font-size:2.5rem;
+.login-logo{text-align:center;margin-bottom:26px;}
+.login-logo img{width:72px;height:72px;border-radius:16px;object-fit:cover;
+  margin-bottom:10px;box-shadow:0 4px 16px rgba(59,130,246,0.2);}
+.login-logo h1{font-family:var(--font-display);font-size:2.2rem;
   background:linear-gradient(135deg,var(--blue),var(--orange),var(--pink));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
-.login-logo p{color:var(--muted);font-size:0.85rem;font-weight:600;margin-top:4px;}
-.pw-wrap{position:relative;}
-.pw-wrap input{padding-right:44px;}
-.pw-eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);
-  background:none;border:none;cursor:pointer;color:var(--muted);font-size:1rem;transition:color 0.2s;}
-.pw-eye:hover{color:var(--blue);}
-.login-footer{text-align:center;margin-top:18px;font-size:0.82rem;color:var(--muted);font-weight:600;}
-.login-footer a{color:var(--blue);cursor:pointer;font-weight:800;}
-.login-footer a:hover{text-decoration:underline;}
+.login-logo p{color:var(--muted);font-size:0.82rem;font-weight:600;margin-top:4px;font-family:var(--font);}
+
 /* ═══════════════════════════════════════
    SIGNUP SCREEN
 ═══════════════════════════════════════ */
 #screen-signup{
+  min-height:100vh;padding:24px 16px 100px;
   background:linear-gradient(160deg,#fce7f3 0%,#dbeafe 60%,#ecfdf5 100%);
-  min-height:100vh;display:flex;align-items:flex-start;justify-content:center;
-  padding:32px 16px;
+  display:flex;align-items:flex-start;justify-content:center;
 }
 .signup-box{
-  background:rgba(255,255,255,0.94);backdrop-filter:blur(16px);
+  background:rgba(255,255,255,0.96);backdrop-filter:blur(16px);
   border:1.5px solid rgba(255,255,255,0.8);border-radius:24px;
-  width:100%;max-width:540px;padding:36px 32px;
+  width:100%;max-width:520px;padding:30px 26px;
   box-shadow:0 20px 60px rgba(236,72,153,0.1);
   animation:slideUp 0.4s ease;
 }
-.otp-box{
-  display:none;background:var(--blue-light);border:1.5px solid var(--border);
-  border-radius:12px;padding:20px;margin-bottom:18px;text-align:center;
-}
-.otp-box.show{display:block;}
-.otp-box p{font-size:0.85rem;color:var(--muted);font-weight:600;margin-bottom:10px;}
-.otp-input-row{display:flex;gap:8px;justify-content:center;margin-top:10px;}
-.otp-digit{
-  width:46px;height:50px;text-align:center;font-size:1.3rem;font-weight:900;
-  border:2px solid var(--border);border-radius:10px;background:#fff;
-  outline:none;transition:border-color 0.2s;
-}
-.otp-digit:focus{border-color:var(--blue);}
+@media(max-width:480px){.signup-box{padding:22px 16px;}}
+
+/* ═══════════════════════════════════════
+   PW RULES
+═══════════════════════════════════════ */
+.pw-wrap{position:relative;}
+.pw-wrap input{padding-right:46px;}
+.pw-eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;cursor:pointer;color:var(--muted);font-size:1.1rem;
+  padding:4px;transition:color 0.2s;}
+.pw-eye:hover{color:var(--blue);}
 .pw-rules{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px;}
+@media(max-width:380px){.pw-rules{grid-template-columns:1fr;}}
 .pw-rule{
   font-size:0.72rem;font-weight:700;padding:4px 8px;border-radius:6px;
   display:flex;align-items:center;gap:4px;
   background:var(--light);color:var(--muted);transition:all 0.2s;
+  font-family:var(--font);
 }
 .pw-rule.ok{background:var(--green-light);color:var(--green);}
 .pw-rule.fail{background:var(--red-light);color:var(--red);}
 .uid-preview{
   background:var(--orange-light);border:1.5px solid #fed7aa;
-  border-radius:10px;padding:12px 16px;margin-bottom:14px;
+  border-radius:10px;padding:12px 14px;margin-bottom:12px;
   display:none;align-items:center;justify-content:space-between;
 }
 .uid-preview.show{display:flex;}
 .invite-notice{
   background:var(--green-light);border:1.5px solid #bbf7d0;
-  border-radius:10px;padding:12px 16px;margin-bottom:16px;
-  font-size:0.82rem;font-weight:700;color:var(--green);display:none;
+  border-radius:10px;padding:12px 14px;margin-bottom:14px;
+  font-size:0.82rem;font-weight:700;color:var(--green);
+  font-family:var(--font);display:none;
 }
 .invite-notice.show{display:block;}
+
 /* ═══════════════════════════════════════
-   PENDING APPROVAL
+   OTP
+═══════════════════════════════════════ */
+.otp-box{
+  background:var(--blue-light);border:1.5px solid var(--border);
+  border-radius:12px;padding:18px;margin-bottom:16px;text-align:center;
+}
+.otp-input-row{display:flex;gap:8px;justify-content:center;margin-top:10px;}
+.otp-digit{
+  width:44px;height:50px;text-align:center;
+  font-size:1.3rem;font-weight:900;font-family:var(--font);
+  border:2px solid var(--border);border-radius:10px;background:#fff;
+  outline:none;transition:border-color 0.2s;
+  -webkit-appearance:none;
+}
+.otp-digit:focus{border-color:var(--blue);}
+@media(max-width:380px){.otp-digit{width:38px;height:44px;font-size:1.1rem;}}
+
+/* ═══════════════════════════════════════
+   PENDING SCREEN
 ═══════════════════════════════════════ */
 .pending-screen{
   display:flex;align-items:center;justify-content:center;
@@ -283,16 +371,22 @@ table.dtbl tr:hover td{background:var(--blue-light);}
 }
 .pending-box{
   background:#fff;border:1.5px solid #fde68a;border-radius:24px;
-  padding:44px 36px;max-width:420px;text-align:center;
-  box-shadow:0 12px 40px rgba(217,119,6,0.1);
+  padding:40px 28px;max-width:400px;text-align:center;
+  box-shadow:0 12px 40px rgba(217,119,6,0.12);
 }
+
 /* ═══════════════════════════════════════
-   TRIP CARDS (Organiser)
+   TRIP CARDS
 ═══════════════════════════════════════ */
-.trips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px;margin-bottom:20px;}
+.trips-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  gap:16px;margin-bottom:16px;
+}
+@media(max-width:600px){.trips-grid{grid-template-columns:1fr;}}
 .trip-card-item{
   background:var(--card);border:1.5px solid var(--border);
-  border-radius:var(--r);padding:22px;cursor:pointer;
+  border-radius:var(--r);padding:20px;cursor:pointer;
   position:relative;overflow:hidden;
   box-shadow:var(--shadow);transition:all 0.25s;
 }
@@ -300,136 +394,194 @@ table.dtbl tr:hover td{background:var(--blue-light);}
   content:'';position:absolute;top:0;left:0;right:0;height:4px;
   background:linear-gradient(90deg,var(--blue),var(--orange),var(--pink));
 }
-.trip-card-item:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);}
-.trip-card-item .tc-name{font-family:'Pacifico',cursive;font-size:1.1rem;color:var(--blue2);margin-bottom:5px;}
-.trip-card-item .tc-dates{font-size:0.78rem;color:var(--muted);font-weight:600;margin-bottom:10px;}
+.trip-card-item:hover,.trip-card-item:active{transform:translateY(-2px);box-shadow:var(--shadow-lg);}
+.trip-card-item .tc-name{font-family:var(--font-display);font-size:1.05rem;color:var(--blue2);margin-bottom:5px;}
+.trip-card-item .tc-dates{font-size:0.78rem;color:var(--muted);font-weight:600;margin-bottom:10px;font-family:var(--font);}
 .trip-card-item .tc-bottom{
   display:flex;justify-content:space-between;align-items:center;
   border-top:1.5px solid var(--border);padding-top:10px;margin-top:8px;
 }
+
 /* ═══════════════════════════════════════
    MODAL
 ═══════════════════════════════════════ */
 .overlay{
   display:none;position:fixed;inset:0;z-index:300;
-  background:rgba(30,41,59,0.4);backdrop-filter:blur(6px);
-  align-items:center;justify-content:center;padding:16px;
+  background:rgba(30,41,59,0.45);backdrop-filter:blur(6px);
+  align-items:flex-end;justify-content:center;padding:0;
 }
 .overlay.open{display:flex;}
-.modal{
-  background:#fff;border:1.5px solid var(--border);border-radius:20px;
-  width:100%;max-width:540px;max-height:90vh;overflow-y:auto;
-  padding:30px;position:relative;
-  box-shadow:0 20px 60px rgba(30,41,59,0.2);
-  animation:modalPop 0.22s cubic-bezier(0.34,1.56,0.64,1);
+@media(min-width:600px){
+  .overlay{align-items:center;padding:16px;}
 }
+.modal{
+  background:#fff;border:1.5px solid var(--border);
+  width:100%;max-width:520px;
+  max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:28px 22px;position:relative;
+  box-shadow:0 -8px 40px rgba(30,41,59,0.15);
+  border-radius:24px 24px 0 0;
+  animation:sheetUp 0.28s cubic-bezier(0.34,1.2,0.64,1);
+}
+@media(min-width:600px){
+  .modal{border-radius:20px;box-shadow:0 20px 60px rgba(30,41,59,0.2);
+    animation:modalPop 0.22s cubic-bezier(0.34,1.56,0.64,1);}
+}
+@keyframes sheetUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
 @keyframes modalPop{from{transform:scale(0.88);opacity:0;}to{transform:scale(1);opacity:1;}}
-.modal h3{font-family:'Pacifico',cursive;font-size:1.3rem;color:var(--blue2);margin-bottom:20px;}
+/* Drag handle on mobile modals */
+.modal::before{
+  content:'';display:block;width:40px;height:4px;
+  background:var(--border);border-radius:2px;
+  margin:0 auto 20px;
+}
+@media(min-width:600px){.modal::before{display:none;}}
+.modal h3{font-family:var(--font-display);font-size:1.25rem;color:var(--blue2);margin-bottom:18px;}
 .modal-x{
-  position:absolute;top:14px;right:16px;
+  position:absolute;top:20px;right:18px;
   background:var(--light);border:none;border-radius:50%;
   width:30px;height:30px;cursor:pointer;font-size:1rem;
-  color:var(--muted);transition:all 0.2s;display:flex;align-items:center;justify-content:center;
+  color:var(--muted);transition:all 0.2s;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font);
 }
 .modal-x:hover{background:var(--red-light);color:var(--red);}
+
 /* ═══════════════════════════════════════
-   EXPENSE LIST
+   EXPENSES
 ═══════════════════════════════════════ */
 .exp-item{
-  display:flex;align-items:center;gap:12px;
+  display:flex;align-items:center;gap:10px;
   padding:11px 0;border-bottom:1px solid var(--border);
 }
 .exp-item:last-child{border-bottom:none;}
 .exp-icon{width:36px;height:36px;border-radius:10px;
   display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;}
-.exp-body{flex:1;}
-.exp-cat{font-size:0.68rem;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:0.5px;}
-.exp-note{font-size:0.87rem;font-weight:700;}
-.exp-amt{font-weight:900;color:var(--orange);white-space:nowrap;}
-.exp-sub{font-size:0.72rem;color:var(--muted);}
+.exp-body{flex:1;min-width:0;}
+.exp-cat{font-size:0.65rem;color:var(--muted);font-weight:800;
+  text-transform:uppercase;letter-spacing:0.5px;font-family:var(--font);}
+.exp-note{font-size:0.85rem;font-weight:700;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--font);}
+.exp-amt{font-weight:900;color:var(--orange);white-space:nowrap;font-family:var(--font);}
+.exp-sub{font-size:0.7rem;color:var(--muted);font-family:var(--font);}
+
 /* ═══════════════════════════════════════
-   MEMBER TABLE
+   MEMBERS
 ═══════════════════════════════════════ */
 .mem-av{
-  width:32px;height:32px;border-radius:50%;
+  width:30px;height:30px;border-radius:50%;
   background:linear-gradient(135deg,var(--blue),var(--pink));
-  color:#fff;font-size:0.72rem;font-weight:900;
-  display:inline-flex;align-items:center;justify-content:center;margin-right:7px;
+  color:#fff;font-size:0.68rem;font-weight:900;
+  display:inline-flex;align-items:center;justify-content:center;
+  margin-right:6px;flex-shrink:0;font-family:var(--font);
 }
 .adv-input{
-  width:90px;background:var(--light);border:1.5px solid var(--border);
-  border-radius:8px;color:var(--text);font-family:'Nunito',sans-serif;
-  font-size:0.85rem;font-weight:700;padding:5px 9px;outline:none;transition:border-color 0.2s;
+  width:88px;background:var(--light);border:1.5px solid var(--border);
+  border-radius:8px;color:var(--text);font-family:var(--font);
+  font-size:0.85rem;font-weight:700;padding:5px 8px;outline:none;
+  transition:border-color 0.2s;-webkit-appearance:none;
 }
 .adv-input:focus{border-color:var(--orange);}
+
 /* ═══════════════════════════════════════
-   INVITE LINK BOX
+   INVITE LINK
 ═══════════════════════════════════════ */
 .invite-link-box{
   background:var(--blue-light);border:1.5px dashed var(--blue);
-  border-radius:12px;padding:14px 16px;
-  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-  margin-top:14px;
+  border-radius:12px;padding:12px 14px;
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  margin-top:12px;
 }
 .invite-link-box .link-text{
-  flex:1;font-size:0.8rem;font-weight:700;color:var(--blue2);
-  word-break:break-all;font-family:monospace;
+  flex:1;font-size:0.75rem;font-weight:700;color:var(--blue2);
+  word-break:break-all;font-family:monospace;min-width:0;
 }
+
 /* ═══════════════════════════════════════
    NOTES
 ═══════════════════════════════════════ */
 .note-item{
   background:var(--yellow-light);border:1.5px solid #fde68a;
-  border-radius:10px;padding:12px 14px;margin-bottom:8px;
+  border-radius:10px;padding:11px 13px;margin-bottom:8px;
 }
-.note-item .note-by{font-size:0.72rem;color:var(--yellow);font-weight:800;}
-.note-item .note-text{font-size:0.88rem;font-weight:600;margin-top:3px;}
+.note-item .note-by{font-size:0.7rem;color:var(--yellow);font-weight:800;font-family:var(--font);}
+.note-item .note-text{font-size:0.87rem;font-weight:600;margin-top:3px;font-family:var(--font);}
+
 /* ═══════════════════════════════════════
-   BACK / SECTION HEADS
+   MISC
 ═══════════════════════════════════════ */
-.sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
-.sec-head h2{font-size:1.1rem;font-weight:800;}
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px;}
+.sec-head h2{font-size:1.05rem;font-weight:800;font-family:var(--font);}
 .back-btn{display:inline-flex;align-items:center;gap:5px;cursor:pointer;
-  color:var(--muted);font-size:0.85rem;font-weight:700;margin-bottom:18px;transition:color 0.2s;}
+  color:var(--muted);font-size:0.85rem;font-weight:700;margin-bottom:16px;
+  transition:color 0.2s;font-family:var(--font);}
 .back-btn:hover{color:var(--blue);}
+.divider{height:1px;background:var(--border);margin:16px 0;}
+.empty-state{text-align:center;padding:36px 16px;color:var(--muted);}
+.empty-state .ei{font-size:2.8rem;display:block;margin-bottom:10px;}
+.empty-state p{font-size:0.9rem;line-height:1.7;font-family:var(--font);}
+.login-footer{text-align:center;margin-top:14px;font-size:0.82rem;color:var(--muted);
+  font-weight:600;font-family:var(--font);}
+.login-footer a{color:var(--blue);cursor:pointer;font-weight:800;}
+
+/* ═══════════════════════════════════════
+   INSTALL BANNER
+═══════════════════════════════════════ */
+#install-banner{
+  display:none;position:fixed;bottom:calc(64px + var(--safe-bottom));left:12px;right:12px;
+  background:linear-gradient(135deg,var(--blue),var(--blue2));
+  color:#fff;border-radius:16px;padding:14px 16px;
+  box-shadow:0 8px 24px rgba(59,130,246,0.35);
+  z-index:150;align-items:center;gap:12px;
+  font-family:var(--font);
+}
+#install-banner.show{display:flex;}
+@media(min-width:769px){
+  #install-banner{bottom:20px;left:auto;right:20px;max-width:340px;}
+}
+#install-banner .ib-icon{font-size:1.5rem;flex-shrink:0;}
+#install-banner .ib-text{flex:1;}
+#install-banner .ib-title{font-size:0.88rem;font-weight:800;}
+#install-banner .ib-sub{font-size:0.75rem;opacity:0.85;margin-top:2px;}
+#install-banner .ib-btn{
+  background:rgba(255,255,255,0.25);border:1.5px solid rgba(255,255,255,0.5);
+  color:#fff;font-family:var(--font);font-weight:800;font-size:0.78rem;
+  border-radius:8px;padding:7px 12px;cursor:pointer;white-space:nowrap;
+  transition:background 0.2s;
+}
+#install-banner .ib-btn:hover{background:rgba(255,255,255,0.4);}
+#install-banner .ib-close{
+  background:none;border:none;color:rgba(255,255,255,0.7);
+  font-size:1.2rem;cursor:pointer;padding:2px;flex-shrink:0;
+}
+
 /* ═══════════════════════════════════════
    TOAST
 ═══════════════════════════════════════ */
 #toast{
-  position:fixed;bottom:24px;left:50%;
+  position:fixed;bottom:calc(70px + var(--safe-bottom));left:50%;
   transform:translateX(-50%) translateY(80px);
   background:var(--text);color:#fff;border-radius:12px;
-  padding:11px 24px;font-size:0.88rem;font-weight:700;
-  box-shadow:0 4px 20px rgba(0,0,0,0.2);z-index:500;pointer-events:none;transition:transform 0.3s;
+  padding:11px 22px;font-size:0.88rem;font-weight:700;
+  box-shadow:0 4px 20px rgba(0,0,0,0.2);z-index:500;pointer-events:none;
+  transition:transform 0.3s;white-space:nowrap;font-family:var(--font);
 }
 #toast.show{transform:translateX(-50%) translateY(0);}
+@media(min-width:769px){#toast{bottom:24px;}}
+
 /* ═══════════════════════════════════════
-   DIVIDER
+   ADMIN MOBILE CARD STYLE (users)
 ═══════════════════════════════════════ */
-.divider{height:1px;background:var(--border);margin:18px 0;}
-/* ═══════════════════════════════════════
-   EMPTY STATE
-═══════════════════════════════════════ */
-.empty-state{text-align:center;padding:40px 20px;color:var(--muted);}
-.empty-state .ei{font-size:3rem;display:block;margin-bottom:12px;}
-.empty-state p{font-size:0.9rem;line-height:1.7;}
-/* ═══════════════════════════════════════
-   TRAVELLER ADD WIDGET
-═══════════════════════════════════════ */
-.trav-row{
-  display:flex;align-items:center;justify-content:space-between;
-  background:var(--light);border:1.5px solid var(--border);
-  border-radius:10px;padding:10px 14px;margin-bottom:8px;
+.user-card-mobile{
+  background:var(--card);border:1.5px solid var(--border);
+  border-radius:12px;padding:14px;margin-bottom:10px;
+  box-shadow:var(--shadow);
 }
-.trav-row .tname{font-size:0.88rem;font-weight:700;}
-/* RESPONSIVE */
-@media(max-width:520px){
-  .form-grid-2,.form-grid-3{grid-template-columns:1fr;}
-  .modal{padding:20px;}
-  .topnav{padding:12px 14px;}
-  .main-wrap{padding:18px 12px 60px;}
-  .pw-rules{grid-template-columns:1fr;}
-}
+.user-card-mobile .ucm-top{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.user-card-mobile .ucm-info{flex:1;min-width:0;}
+.user-card-mobile .ucm-name{font-size:0.9rem;font-weight:800;font-family:var(--font);}
+.user-card-mobile .ucm-uname{font-size:0.75rem;color:var(--muted);font-weight:600;font-family:var(--font);}
+.user-card-mobile .ucm-actions{display:flex;gap:6px;flex-wrap:wrap;}
 </style>
 </head>
 <body>
@@ -450,19 +602,18 @@ table.dtbl tr:hover td{background:var(--blue-light);}
   </div>
 </div>
 
-<!-- ════════════════════════════════════════════
-  SCREEN: LOGIN
-════════════════════════════════════════════ -->
+<!-- ════ SCREEN: LOGIN ════ -->
 <div class="screen active" id="screen-login">
   <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:linear-gradient(160deg,#dbeafe 0%,#fef3c7 50%,#fce7f3 100%);">
     <div class="login-box">
       <div class="login-logo">
-        <h1>✈️ TravelMate</h1>
+        <img src="logo.png" alt="TravelMate" onerror="this.style.display='none'">
+        <h1>TravelMate</h1>
         <p>Plan trips · Split expenses · Travel happy</p>
       </div>
       <div class="form-row">
         <label>Username</label>
-        <input type="text" id="login-user" placeholder="Enter your username here" autocomplete="username">
+        <input type="text" id="login-user" placeholder="e.g. ganesh031099" autocomplete="username" inputmode="text">
       </div>
       <div class="form-row">
         <label>Password</label>
@@ -471,56 +622,47 @@ table.dtbl tr:hover td{background:var(--blue-light);}
           <button class="pw-eye" type="button" onclick="togglePwVis('login-pw',this)">👁</button>
         </div>
       </div>
-      <div id="login-err" style="color:var(--red);font-size:0.8rem;font-weight:700;margin-bottom:10px;display:none;"></div>
+      <div id="login-err" style="color:var(--red);font-size:0.8rem;font-weight:700;margin-bottom:10px;display:none;font-family:var(--font);"></div>
       <button class="btn btn-blue btn-full" onclick="doLogin()">Sign In →</button>
       <div class="login-footer" style="margin-top:14px;">
         Don't have an account? <a onclick="showScreen('screen-signup')">Sign Up</a>
-      </div>
-      <div class="login-footer" style="margin-top:6px;font-size:0.75rem;">
-        <a onclick="showScreen('screen-admin-setup-demo')">Admin Setup →</a>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ════════════════════════════════════════════
-  SCREEN: SIGNUP
-════════════════════════════════════════════ -->
+<!-- ════ SCREEN: SIGNUP ════ -->
 <div class="screen" id="screen-signup">
-  <div style="min-height:100vh;background:linear-gradient(160deg,#fce7f3 0%,#dbeafe 60%,#ecfdf5 100%);display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;">
+  <div style="min-height:100vh;background:linear-gradient(160deg,#fce7f3 0%,#dbeafe 60%,#ecfdf5 100%);display:flex;align-items:flex-start;justify-content:center;padding:24px 14px 100px;">
     <div class="signup-box">
-      <div style="text-align:center;margin-bottom:24px;">
-        <div style="font-family:'Pacifico',cursive;font-size:1.8rem;background:linear-gradient(135deg,var(--pink),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">✈️ TravelMate</div>
-        <p style="color:var(--muted);font-size:0.83rem;font-weight:600;margin-top:4px;">Create your account</p>
+      <div style="text-align:center;margin-bottom:20px;">
+        <img src="logo.png" alt="TravelMate" style="width:52px;height:52px;border-radius:12px;object-fit:cover;margin-bottom:8px;" onerror="this.style.display='none'">
+        <div style="font-family:var(--font-display);font-size:1.6rem;background:linear-gradient(135deg,var(--pink),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">TravelMate</div>
+        <p style="color:var(--muted);font-size:0.8rem;font-weight:600;margin-top:4px;">Create your account</p>
       </div>
-
-      <!-- Invite notice -->
       <div class="invite-notice" id="invite-notice">
-        🎉 You were invited by a Trip Organiser! Your role is set to <strong>Traveller</strong> and you'll be auto-approved.
+        🎉 You were invited! Your role is set to <strong>Traveller</strong> and you'll be auto-approved.
       </div>
-
-      <!-- Step 1: Form -->
       <div id="signup-step1">
         <div class="form-grid-2">
           <div class="form-row"><label>First Name *</label>
-            <input type="text" id="s-fname" placeholder="Enter your first name" oninput="su_updatePreview()"></div>
+            <input type="text" id="s-fname" placeholder="Ganesh" oninput="su_updatePreview()" autocomplete="given-name"></div>
           <div class="form-row"><label>Last Name</label>
-            <input type="text" id="s-lname" placeholder="Enter your first name"></div>
+            <input type="text" id="s-lname" placeholder="Patil" autocomplete="family-name"></div>
         </div>
         <div class="form-row"><label>Date of Birth *</label>
           <input type="date" id="s-dob" oninput="su_updatePreview()"></div>
-
-        <!-- Username preview -->
         <div class="uid-preview" id="su-uid-prev">
-          <div><div style="font-size:0.7rem;font-weight:800;color:var(--yellow);text-transform:uppercase;letter-spacing:0.7px;">Your Username (auto-generated)</div>
-            <div style="font-size:1rem;font-weight:900;color:#c2410c;" id="su-uid-val">—</div></div>
-          <span style="font-size:1.4rem;">🪪</span>
+          <div>
+            <div style="font-size:0.68rem;font-weight:800;color:var(--yellow);text-transform:uppercase;letter-spacing:0.7px;font-family:var(--font);">Your Auto Username</div>
+            <div style="font-size:0.95rem;font-weight:900;color:#c2410c;font-family:var(--font);" id="su-uid-val">—</div>
+          </div>
+          <span style="font-size:1.3rem;">🪪</span>
         </div>
-
         <div class="form-row"><label>Mobile Number *</label>
-          <input type="tel" id="s-mobile" placeholder="XXXXXXXXXX" maxlength="10"></div>
+          <input type="tel" id="s-mobile" placeholder="9876543210" maxlength="10" inputmode="numeric"></div>
         <div class="form-row"><label>Email Address *</label>
-          <input type="email" id="s-email" placeholder="xyz@Gmail.com"></div>
+          <input type="email" id="s-email" placeholder="you@email.com" inputmode="email"></div>
         <div class="form-grid-2">
           <div class="form-row"><label>Gender *</label>
             <select id="s-gender">
@@ -536,7 +678,7 @@ table.dtbl tr:hover td{background:var(--blue-light);}
         </div>
         <div class="form-row"><label>Password *</label>
           <div class="pw-wrap">
-            <input type="password" id="s-pw" placeholder="Min 8 chars" oninput="su_checkPw()">
+            <input type="password" id="s-pw" placeholder="Min 8 chars" oninput="su_checkPw()" autocomplete="new-password">
             <button class="pw-eye" type="button" onclick="togglePwVis('s-pw',this)">👁</button>
           </div>
           <div class="pw-rules" id="su-pw-rules">
@@ -548,29 +690,27 @@ table.dtbl tr:hover td{background:var(--blue-light);}
         </div>
         <div class="form-row"><label>Confirm Password *</label>
           <div class="pw-wrap">
-            <input type="password" id="s-cpw" placeholder="Repeat password" oninput="su_checkPw()">
+            <input type="password" id="s-cpw" placeholder="Repeat password" oninput="su_checkPw()" autocomplete="new-password">
             <button class="pw-eye" type="button" onclick="togglePwVis('s-cpw',this)">👁</button>
           </div>
-          <div id="su-pw-match" style="font-size:0.75rem;font-weight:700;margin-top:5px;"></div>
+          <div id="su-pw-match" style="font-size:0.75rem;font-weight:700;margin-top:5px;font-family:var(--font);"></div>
         </div>
         <button class="btn btn-pink btn-full" onclick="su_sendOtp()">Send OTP to Email →</button>
         <div class="login-footer" style="margin-top:14px;">
           Already have an account? <a onclick="showScreen('screen-login')">Sign In</a>
         </div>
       </div>
-
-      <!-- Step 2: OTP -->
       <div id="signup-step2" style="display:none;">
-        <div class="otp-box show">
-          <p>📧 We've sent a 6-digit OTP to your email.<br>Enter it below to verify.</p>
-          <div style="font-size:0.75rem;color:var(--muted);margin-top:4px;">(Demo mode: OTP is <strong id="otp-hint" style="color:var(--blue)"></strong>)</div>
-          <div class="otp-input-row" id="otp-inputs">
-            <input class="otp-digit" maxlength="1" oninput="otpNext(this,0)">
-            <input class="otp-digit" maxlength="1" oninput="otpNext(this,1)">
-            <input class="otp-digit" maxlength="1" oninput="otpNext(this,2)">
-            <input class="otp-digit" maxlength="1" oninput="otpNext(this,3)">
-            <input class="otp-digit" maxlength="1" oninput="otpNext(this,4)">
-            <input class="otp-digit" maxlength="1" oninput="otpNext(this,5)">
+        <div class="otp-box">
+          <p style="font-size:0.85rem;color:var(--muted);font-weight:600;font-family:var(--font);">📧 OTP sent to your email. Enter it below.</p>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;font-family:var(--font);">Demo mode — OTP: <strong id="otp-hint" style="color:var(--blue)"></strong></div>
+          <div class="otp-input-row">
+            <input class="otp-digit" maxlength="1" inputmode="numeric" oninput="otpNext(this,0)">
+            <input class="otp-digit" maxlength="1" inputmode="numeric" oninput="otpNext(this,1)">
+            <input class="otp-digit" maxlength="1" inputmode="numeric" oninput="otpNext(this,2)">
+            <input class="otp-digit" maxlength="1" inputmode="numeric" oninput="otpNext(this,3)">
+            <input class="otp-digit" maxlength="1" inputmode="numeric" oninput="otpNext(this,4)">
+            <input class="otp-digit" maxlength="1" inputmode="numeric" oninput="otpNext(this,5)">
           </div>
         </div>
         <button class="btn btn-blue btn-full" onclick="su_verifyOtp()">Verify & Register ✓</button>
@@ -578,122 +718,119 @@ table.dtbl tr:hover td{background:var(--blue-light);}
           <button class="btn btn-ghost btn-sm" onclick="document.getElementById('signup-step1').style.display='block';document.getElementById('signup-step2').style.display='none';">← Back</button>
         </div>
       </div>
-
     </div>
   </div>
 </div>
 
-<!-- ════════════════════════════════════════════
-  SCREEN: PENDING APPROVAL
-════════════════════════════════════════════ -->
+<!-- ════ SCREEN: PENDING ════ -->
 <div class="screen" id="screen-pending">
   <div class="pending-screen">
     <div class="pending-box">
-      <div style="font-size:4rem;margin-bottom:16px;">⏳</div>
-      <h2 style="font-family:'Pacifico',cursive;color:var(--yellow);font-size:1.6rem;margin-bottom:10px;">Awaiting Approval</h2>
-      <p style="color:var(--muted);font-size:0.9rem;line-height:1.7;">Your signup request has been submitted. The Admin will review and approve your account. You'll receive an email with your username once approved.</p>
-      <div style="margin-top:24px;font-size:0.82rem;color:var(--muted);font-weight:600;">
-        Your submitted email: <strong id="pending-email" style="color:var(--blue)"></strong>
+      <div style="font-size:3.5rem;margin-bottom:14px;">⏳</div>
+      <h2 style="font-family:var(--font-display);color:var(--yellow);font-size:1.5rem;margin-bottom:10px;">Awaiting Approval</h2>
+      <p style="color:var(--muted);font-size:0.88rem;line-height:1.7;font-family:var(--font);">Your signup is submitted. Admin will review and approve. You'll receive an email with your username once approved.</p>
+      <div style="margin-top:18px;font-size:0.8rem;color:var(--muted);font-weight:600;font-family:var(--font);">
+        Email: <strong id="pending-email" style="color:var(--blue)"></strong>
       </div>
-      <button class="btn btn-ghost btn-sm" style="margin-top:18px;" onclick="showScreen('screen-login')">← Back to Login</button>
+      <button class="btn btn-ghost btn-sm" style="margin-top:16px;" onclick="showScreen('screen-login')">← Back to Login</button>
     </div>
   </div>
 </div>
 
-<!-- ════════════════════════════════════════════
-  SCREEN: ADMIN DASHBOARD
-════════════════════════════════════════════ -->
+<!-- ════ SCREEN: ADMIN ════ -->
 <div class="screen" id="screen-admin">
   <div class="topnav">
-    <div class="logo">✈️ TravelMate</div>
+    <div class="logo">
+      <img src="logo.png" alt="" onerror="this.style.display='none'">
+      TravelMate
+    </div>
     <div class="nav-right">
       <div class="user-chip">
         <div class="av" id="admin-av">A</div>
         <span class="uname" id="admin-uname">Admin</span>
-        <span class="badge rb-admin">Admin</span>
+        <span class="role-badge rb-admin">Admin</span>
       </div>
       <button class="btn btn-ghost btn-sm" onclick="doLogout()">Sign Out</button>
     </div>
   </div>
   <div class="main-wrap">
-    <!-- Stats -->
     <div class="stats-row" id="admin-stats"></div>
-
-    <!-- Tabs -->
-    <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
-      <button class="btn btn-blue btn-sm" onclick="adminTab('pending')">⏳ Pending Approvals</button>
-      <button class="btn btn-ghost btn-sm" onclick="adminTab('users')">👥 All Users</button>
-      <button class="btn btn-ghost btn-sm" onclick="adminTab('trips')">🗺 All Trips</button>
+    <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;">
+      <button class="btn btn-blue btn-sm" id="atab-pending" onclick="adminTab('pending')">⏳ Pending</button>
+      <button class="btn btn-ghost btn-sm" id="atab-users" onclick="adminTab('users')">👥 Users</button>
+      <button class="btn btn-ghost btn-sm" id="atab-trips" onclick="adminTab('trips')">🗺 Trips</button>
     </div>
-
-    <!-- Pending -->
-    <div class="card" id="admin-tab-pending">
-      <div class="card-title">⏳ Pending Signups</div>
-      <div class="tbl-wrap"><table class="dtbl" id="admin-pending-tbl">
-        <thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Mobile</th><th>Role</th><th>Requested</th><th>Action</th></tr></thead>
-        <tbody id="admin-pending-body"></tbody>
-      </table></div>
-    </div>
-
-    <!-- All Users -->
-    <div class="card" id="admin-tab-users" style="display:none;">
-      <div class="card-title">👥 All Users</div>
-      <div class="tbl-wrap"><table class="dtbl">
-        <thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Mobile</th><th>Role</th><th>Status</th><th>Joined</th></tr></thead>
-        <tbody id="admin-users-body"></tbody>
-      </table></div>
-    </div>
-
-    <!-- All Trips -->
-    <div class="card" id="admin-tab-trips" style="display:none;">
-      <div class="sec-head">
-        <div class="card-title" style="margin-bottom:0;">🗺 All Trips</div>
+    <div id="admin-tab-pending">
+      <div class="card">
+        <div class="card-title">⏳ Pending Signups</div>
+        <div id="admin-pending-content"></div>
       </div>
-      <div id="admin-trips-list"></div>
     </div>
+    <div id="admin-tab-users" style="display:none;">
+      <div class="card">
+        <div class="card-title">👥 All Users</div>
+        <div id="admin-users-content"></div>
+      </div>
+    </div>
+    <div id="admin-tab-trips" style="display:none;">
+      <div class="card">
+        <div class="card-title">🗺 All Trips</div>
+        <div id="admin-trips-content"></div>
+      </div>
+    </div>
+  </div>
+  <div class="bottom-nav" id="admin-bottom-nav">
+    <div class="bn-item active" onclick="adminTab('pending')"><div class="bn-icon">⏳</div><div class="bn-label">Pending</div></div>
+    <div class="bn-item" onclick="adminTab('users')"><div class="bn-icon">👥</div><div class="bn-label">Users</div></div>
+    <div class="bn-item" onclick="adminTab('trips')"><div class="bn-icon">🗺</div><div class="bn-label">Trips</div></div>
   </div>
 </div>
 
-<!-- ════════════════════════════════════════════
-  SCREEN: ORGANISER DASHBOARD
-════════════════════════════════════════════ -->
+<!-- ════ SCREEN: ORGANISER ════ -->
 <div class="screen" id="screen-organiser">
   <div class="topnav">
-    <div class="logo">✈️ TravelMate</div>
+    <div class="logo">
+      <img src="logo.png" alt="" onerror="this.style.display='none'">
+      TravelMate
+    </div>
     <div class="nav-right">
       <div class="user-chip">
         <div class="av" id="org-av">O</div>
         <span class="uname" id="org-uname">Organiser</span>
-        <span class="badge rb-organiser">Organiser</span>
+        <span class="role-badge rb-organiser">Organiser</span>
       </div>
       <button class="btn btn-ghost btn-sm" onclick="doLogout()">Sign Out</button>
     </div>
   </div>
   <div class="main-wrap">
-    <!-- Organiser: Trips view -->
     <div id="org-trips-view">
       <div class="sec-head">
         <h2>🗺 My Trips</h2>
-        <button class="btn btn-blue" onclick="openModal('modal-new-trip')">＋ New Trip</button>
+        <button class="btn btn-blue btn-sm" onclick="openModal('modal-new-trip')">＋ New Trip</button>
       </div>
       <div class="trips-grid" id="org-trips-grid"></div>
     </div>
-    <!-- Organiser: Trip detail -->
     <div id="org-detail-view" style="display:none;"></div>
+  </div>
+  <div class="bottom-nav">
+    <div class="bn-item active" onclick="renderOrgTrips()"><div class="bn-icon">🗺</div><div class="bn-label">Trips</div></div>
+    <div class="bn-item" onclick="openModal('modal-new-trip')"><div class="bn-icon">＋</div><div class="bn-label">New Trip</div></div>
+    <div class="bn-item" onclick="doLogout()"><div class="bn-icon">👤</div><div class="bn-label">Sign Out</div></div>
   </div>
 </div>
 
-<!-- ════════════════════════════════════════════
-  SCREEN: TRAVELLER DASHBOARD
-════════════════════════════════════════════ -->
+<!-- ════ SCREEN: TRAVELLER ════ -->
 <div class="screen" id="screen-traveller">
   <div class="topnav">
-    <div class="logo">✈️ TravelMate</div>
+    <div class="logo">
+      <img src="logo.png" alt="" onerror="this.style.display='none'">
+      TravelMate
+    </div>
     <div class="nav-right">
       <div class="user-chip">
         <div class="av" id="trv-av">T</div>
         <span class="uname" id="trv-uname">Traveller</span>
-        <span class="badge rb-traveller">Traveller</span>
+        <span class="role-badge rb-traveller">Traveller</span>
       </div>
       <button class="btn btn-ghost btn-sm" onclick="doLogout()">Sign Out</button>
     </div>
@@ -705,17 +842,19 @@ table.dtbl tr:hover td{background:var(--blue-light);}
     </div>
     <div id="trv-detail-view" style="display:none;"></div>
   </div>
+  <div class="bottom-nav">
+    <div class="bn-item active" onclick="renderTrvTrips()"><div class="bn-icon">🎒</div><div class="bn-label">Trips</div></div>
+    <div class="bn-item" onclick="openModal('modal-add-note')"><div class="bn-icon">📝</div><div class="bn-label">Note</div></div>
+    <div class="bn-item" onclick="doLogout()"><div class="bn-icon">👤</div><div class="bn-label">Sign Out</div></div>
+  </div>
 </div>
 
-<!-- ════════════════════════════════════════════
-  MODALS
-════════════════════════════════════════════ -->
-
-<!-- New Trip Modal -->
+<!-- ════ MODALS ════ -->
+<!-- New Trip -->
 <div class="overlay" id="modal-new-trip">
   <div class="modal">
     <button class="modal-x" onclick="closeModal('modal-new-trip')">×</button>
-    <h3>🗺 Create New Trip</h3>
+    <h3>🗺 New Trip</h3>
     <div class="form-row"><label>Trip Name *</label>
       <input type="text" id="nt-name" placeholder="e.g. Goa Beach Trip"></div>
     <div class="form-grid-2">
@@ -723,23 +862,23 @@ table.dtbl tr:hover td{background:var(--blue-light);}
       <div class="form-row"><label>End Date</label><input type="date" id="nt-end" oninput="nt_calcDays()"></div>
     </div>
     <div class="form-grid-2">
-      <div class="form-row"><label>Days</label><input type="number" id="nt-days" min="1" value="1" placeholder="1"></div>
-      <div class="form-row"><label>Nights</label><input type="number" id="nt-nights" min="0" value="0" placeholder="0"></div>
+      <div class="form-row"><label>Days</label><input type="number" id="nt-days" min="1" value="1" inputmode="numeric"></div>
+      <div class="form-row"><label>Nights</label><input type="number" id="nt-nights" min="0" value="0" inputmode="numeric"></div>
     </div>
     <div class="form-row"><label>Estimated Budget (₹)</label>
-      <input type="number" id="nt-budget" placeholder="Optional"></div>
+      <input type="number" id="nt-budget" placeholder="Optional" inputmode="numeric"></div>
     <div class="form-row">
-      <label>Add Travellers (from approved list)</label>
-      <div id="nt-travellers-available" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;"></div>
-      <div style="font-size:0.75rem;color:var(--muted);font-weight:600;margin-top:6px;">Click to select / deselect</div>
+      <label>Add Travellers</label>
+      <div id="nt-travellers-available" style="margin-top:6px;"></div>
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;margin-top:5px;font-family:var(--font);">Tap to select / deselect</div>
     </div>
     <div class="form-row"><label>Notes</label>
-      <textarea id="nt-notes" placeholder="Places to visit, notes..."></textarea></div>
+      <textarea id="nt-notes" placeholder="Places to visit..."></textarea></div>
     <button class="btn btn-blue btn-full" onclick="saveNewTrip()">Create Trip ✈️</button>
   </div>
 </div>
 
-<!-- Add Expense Modal -->
+<!-- Add Expense -->
 <div class="overlay" id="modal-add-expense">
   <div class="modal">
     <button class="modal-x" onclick="closeModal('modal-add-expense')">×</button>
@@ -750,7 +889,7 @@ table.dtbl tr:hover td{background:var(--blue-light);}
         <option value="hotel">🏨 Hotel / Stay</option>
         <option value="fuel">⛽ Fuel</option>
         <option value="food">🍽 Food & Drinks</option>
-        <option value="transport">🚌 Local Transport</option>
+        <option value="transport">🚌 Transport</option>
         <option value="entry">🎢 Entry Tickets</option>
         <option value="shopping">🛍 Shopping</option>
         <option value="misc">📦 Misc</option>
@@ -759,37 +898,44 @@ table.dtbl tr:hover td{background:var(--blue-light);}
       <input type="text" id="ae-note" placeholder="e.g. Hotel stay 2 nights..."></div>
     <div class="form-grid-2">
       <div class="form-row"><label>Amount (₹) *</label>
-        <input type="number" id="ae-amount" min="0" placeholder="0"></div>
-      <div class="form-row"><label>Date</label>
-        <input type="date" id="ae-date"></div>
+        <input type="number" id="ae-amount" min="0" placeholder="0" inputmode="decimal"></div>
+      <div class="form-row"><label>Date</label><input type="date" id="ae-date"></div>
     </div>
     <div class="form-row"><label>Paid By</label>
-      <select id="ae-paidby"><option value="">-- Select Member --</option></select></div>
+      <select id="ae-paidby"><option value="">-- Select --</option></select></div>
     <div class="form-row">
-      <label>Split Among (leave blank = all)</label>
+      <label>Split Among (blank = all)</label>
       <div id="ae-split-checks" style="display:flex;flex-wrap:wrap;gap:7px;margin-top:6px;"></div>
     </div>
     <button class="btn btn-orange btn-full" onclick="saveExpense()">Add Expense 💳</button>
   </div>
 </div>
 
-<!-- Add Note Modal (Traveller) -->
+<!-- Add Note -->
 <div class="overlay" id="modal-add-note">
   <div class="modal">
     <button class="modal-x" onclick="closeModal('modal-add-note')">×</button>
-    <h3>📝 Add Note for Organiser</h3>
+    <h3>📝 Note for Organiser</h3>
     <div class="form-row"><label>Your Note</label>
-      <textarea id="note-text" placeholder="Type your message or note for the organiser..." style="min-height:100px;"></textarea></div>
+      <textarea id="note-text" placeholder="Type your message..." style="min-height:100px;"></textarea></div>
     <button class="btn btn-blue btn-full" onclick="saveNote()">Send Note 📨</button>
   </div>
+</div>
+
+<!-- Install Banner -->
+<div id="install-banner">
+  <div class="ib-icon">📱</div>
+  <div class="ib-text">
+    <div class="ib-title">Install TravelMate</div>
+    <div class="ib-sub">Add to home screen for easy access</div>
+  </div>
+  <button class="ib-btn" id="install-btn">Install</button>
+  <button class="ib-close" onclick="document.getElementById('install-banner').classList.remove('show')">×</button>
 </div>
 
 <!-- Toast -->
 <div id="toast"></div>
 
-<!-- ════════════════════════════════════════════
-  JAVASCRIPT
-════════════════════════════════════════════ -->
 <script>
 // ═══════════════════════════════════════════
 //  STORAGE
@@ -800,26 +946,7 @@ function sv(d){ localStorage.setItem('travelmate',JSON.stringify(d)); }
 // ═══════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════
-let currentUser = null;
-let activeTripId = null;
-let selectedTravellers = []; // for new trip modal
-let suPwOk = false;
-let generatedOtp = null;
-let pendingSignupData = null;
-let inviteOrgId = null; // if arrived via invite link
-
-// ═══════════════════════════════════════════
-//  SCREEN ROUTING
-// ═══════════════════════════════════════════
-function showScreen(id){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  const sc=document.getElementById(id);
-  if(sc) sc.classList.add('active');
-  window.scrollTo(0,0);
-  // hide sky deco on login/signup to keep clean
-  const skyFree=['screen-login','screen-signup','screen-pending'];
-  document.getElementById('sky-deco').style.opacity=skyFree.includes(id)?'0.4':'1';
-}
+let currentUser=null,activeTripId=null,selectedTravellers=[],suPwOk=false,generatedOtp=null,pendingSignupData=null,inviteOrgId=null;
 
 // ═══════════════════════════════════════════
 //  UTILS
@@ -828,26 +955,23 @@ function uid(){ return Math.random().toString(36).slice(2,10); }
 function initials(n){ return (n||'?').trim().split(' ').map(p=>p[0]).join('').toUpperCase().slice(0,2); }
 function genUsername(fname,dob){
   if(!fname||!dob) return null;
-  const d=new Date(dob); if(isNaN(d)) return null;
+  const d=new Date(dob);if(isNaN(d)) return null;
   const dd=String(d.getDate()).padStart(2,'0');
   const mm=String(d.getMonth()+1).padStart(2,'0');
   const yy=String(d.getFullYear()).slice(2);
-  return fname.trim().toLowerCase().replace(/\s+/g,'')+dd+mm+yy;
+  return fname.trim().toLowerCase().replace(/[^a-z]/g,'')+dd+mm+yy;
 }
-function genUserId(role, users){
-  const roleUsers=users.filter(u=>u.role===role);
-  const num=String(roleUsers.length+1).padStart(4,'0');
-  const prefix={admin:'TM-ADM',organiser:'TM-ORG',traveller:'TM-TRV'}[role]||'TM-USR';
-  return `${prefix}-${num}`;
+function genUserId(role,users){
+  const n=String(users.filter(u=>u.role===role).length+1).padStart(4,'0');
+  const pre={admin:'TM-ADM',organiser:'TM-ORG',traveller:'TM-TRV'}[role]||'TM-USR';
+  return `${pre}-${n}`;
 }
 function fmt(d){ if(!d) return '—'; const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}); }
 function fmtShort(d){ if(!d) return ''; const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-IN',{day:'numeric',month:'short'}); }
 function toast(msg,col){
   const el=document.getElementById('toast');
-  el.textContent=msg;
-  el.style.background=col||'#1e293b';
-  el.classList.add('show');
-  setTimeout(()=>el.classList.remove('show'),2800);
+  el.textContent=msg;el.style.background=col||'#1e293b';
+  el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2800);
 }
 function togglePwVis(id,btn){
   const el=document.getElementById(id);
@@ -859,19 +983,28 @@ function catLabel(c){ return {hotel:'Hotel/Stay',fuel:'Fuel',food:'Food & Drinks
 function catBg(c){ return {hotel:'#ede9fe',fuel:'#dcfce7',food:'#fff7ed',transport:'#dbeafe',entry:'#fce7f3',shopping:'#fef9c3',misc:'#f1f5f9'}[c]||'#f1f5f9'; }
 
 // ═══════════════════════════════════════════
-//  CHECK INVITE LINK
+//  INVITE LINK CHECK
 // ═══════════════════════════════════════════
 (function(){
   const params=new URLSearchParams(window.location.search);
   if(params.has('invite')){
     inviteOrgId=params.get('invite');
-    // Pre-set role and show notice
-    const roleEl=document.getElementById('s-role');
-    if(roleEl){ roleEl.value='traveller'; roleEl.disabled=true; }
+    const r=document.getElementById('s-role');
+    if(r){r.value='traveller';r.disabled=true;}
     document.getElementById('invite-notice').classList.add('show');
     showScreen('screen-signup');
   }
 })();
+
+// ═══════════════════════════════════════════
+//  SCREEN ROUTING
+// ═══════════════════════════════════════════
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const sc=document.getElementById(id);
+  if(sc) sc.classList.add('active');
+  window.scrollTo(0,0);
+}
 
 // ═══════════════════════════════════════════
 //  LOGIN
@@ -881,24 +1014,20 @@ function doLogin(){
   const pw=document.getElementById('login-pw').value;
   const errEl=document.getElementById('login-err');
   errEl.style.display='none';
-  if(!user||!pw){ errEl.textContent='Please enter username and password.'; errEl.style.display='block'; return; }
+  if(!user||!pw){errEl.textContent='Enter username and password.';errEl.style.display='block';return;}
   const data=ls();
   const found=data.users.find(u=>u.username===user);
-  if(!found){ errEl.textContent='Username not found.'; errEl.style.display='block'; return; }
-  if(found.passwordHash!==btoa(pw)){ errEl.textContent='Incorrect password.'; errEl.style.display='block'; return; }
-  if(found.status==='pending'){ 
-    document.getElementById('pending-email').textContent=found.email;
-    showScreen('screen-pending'); return; 
-  }
-  if(found.status==='rejected'){ errEl.textContent='Your account was not approved. Contact admin.'; errEl.style.display='block'; return; }
+  if(!found){errEl.textContent='Username not found.';errEl.style.display='block';return;}
+  if(found.passwordHash!==btoa(pw)){errEl.textContent='Incorrect password.';errEl.style.display='block';return;}
+  if(found.status==='pending'){document.getElementById('pending-email').textContent=found.email;showScreen('screen-pending');return;}
+  if(found.status==='rejected'){errEl.textContent='Account not approved. Contact admin.';errEl.style.display='block';return;}
   currentUser=found;
   if(found.role==='admin') loadAdminDash();
   else if(found.role==='organiser') loadOrgDash();
   else loadTrvDash();
 }
-
 function doLogout(){
-  currentUser=null; activeTripId=null;
+  currentUser=null;activeTripId=null;
   showScreen('screen-login');
   document.getElementById('login-user').value='';
   document.getElementById('login-pw').value='';
@@ -910,12 +1039,11 @@ function doLogout(){
 function su_updatePreview(){
   const u=genUsername(document.getElementById('s-fname').value,document.getElementById('s-dob').value);
   const prev=document.getElementById('su-uid-prev');
-  if(u){ prev.classList.add('show'); document.getElementById('su-uid-val').textContent=u; }
+  if(u){prev.classList.add('show');document.getElementById('su-uid-val').textContent=u;}
   else prev.classList.remove('show');
 }
 function su_checkPw(){
-  const pw=document.getElementById('s-pw').value;
-  const cpw=document.getElementById('s-cpw').value;
+  const pw=document.getElementById('s-pw').value,cpw=document.getElementById('s-cpw').value;
   const rules={'sr-len':pw.length>=8,'sr-cap':/[A-Z]/.test(pw),'sr-num':/[0-9]/.test(pw),'sr-sym':/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pw)};
   const labels={'sr-len':'Min 8 chars','sr-cap':'Uppercase','sr-num':'Number','sr-sym':'Symbol'};
   suPwOk=Object.values(rules).every(Boolean);
@@ -925,7 +1053,7 @@ function su_checkPw(){
     el.textContent=(ok?'✓ ':'✗ ')+labels[id];
   }
   const m=document.getElementById('su-pw-match');
-  if(cpw){ m.style.color=pw===cpw?'#16a34a':'#dc2626'; m.textContent=pw===cpw?'✓ Passwords match':'✗ No match'; }
+  if(cpw){m.style.color=pw===cpw?'var(--green)':'var(--red)';m.textContent=pw===cpw?'✓ Passwords match':'✗ No match';}
   else m.textContent='';
 }
 function su_sendOtp(){
@@ -937,28 +1065,24 @@ function su_sendOtp(){
   const role=document.getElementById('s-role').value;
   const pw=document.getElementById('s-pw').value;
   const cpw=document.getElementById('s-cpw').value;
-  if(!fname||!dob||!mobile||!email||!gender||!role||!pw){ toast('Please fill all required fields.','#dc2626'); return; }
-  if(!suPwOk){ toast('Password does not meet requirements.','#dc2626'); return; }
-  if(pw!==cpw){ toast('Passwords do not match.','#dc2626'); return; }
-  if(!/^\d{10}$/.test(mobile)){ toast('Enter valid 10-digit mobile.','#dc2626'); return; }
+  if(!fname||!dob||!mobile||!email||!gender||!role||!pw){toast('Fill all required fields.','#dc2626');return;}
+  if(!suPwOk){toast('Password requirements not met.','#dc2626');return;}
+  if(pw!==cpw){toast('Passwords do not match.','#dc2626');return;}
+  if(!/^\d{10}$/.test(mobile)){toast('Enter valid 10-digit mobile.','#dc2626');return;}
   const username=genUsername(fname,dob);
-  if(!username){ toast('Check name and DOB.','#dc2626'); return; }
-  // Check duplicate
+  if(!username){toast('Check name and DOB.','#dc2626');return;}
   const data=ls();
-  if(data.users.find(u=>u.email===email)){ toast('Email already registered.','#dc2626'); return; }
-  if(data.users.find(u=>u.username===username)){ toast('Username already taken. Check if already registered.','#dc2626'); return; }
-  // Generate OTP
+  if(data.users.find(u=>u.email===email)){toast('Email already registered.','#dc2626');return;}
+  if(data.users.find(u=>u.username===username)){toast('Username taken. Already registered?','#dc2626');return;}
   generatedOtp=String(Math.floor(100000+Math.random()*900000));
-  document.getElementById('otp-hint').textContent=generatedOtp; // Demo only
-  pendingSignupData={
-    fname,lname:document.getElementById('s-lname').value.trim(),
-    dob,mobile,email,gender,role,pw,username,inviteOrgId
-  };
+  document.getElementById('otp-hint').textContent=generatedOtp;
+  pendingSignupData={fname,lname:document.getElementById('s-lname').value.trim(),dob,mobile,email,gender,role,pw,username,inviteOrgId};
   document.getElementById('signup-step1').style.display='none';
   document.getElementById('signup-step2').style.display='block';
-  toast('OTP sent! (Check the hint below in demo mode)','#16a34a');
+  toast('OTP sent! (Demo: see hint below)','#16a34a');
 }
 function otpNext(el,idx){
+  el.value=el.value.replace(/[^0-9]/g,'');
   if(el.value.length===1){
     const inputs=document.querySelectorAll('.otp-digit');
     if(idx<5) inputs[idx+1].focus();
@@ -966,168 +1090,201 @@ function otpNext(el,idx){
 }
 function su_verifyOtp(){
   const digits=[...document.querySelectorAll('.otp-digit')].map(i=>i.value).join('');
-  if(digits.length!==6){ toast('Enter complete 6-digit OTP.','#dc2626'); return; }
-  if(digits!==generatedOtp){ toast('Incorrect OTP. Try again.','#dc2626'); return; }
-  // Register user
+  if(digits.length!==6){toast('Enter complete 6-digit OTP.','#dc2626');return;}
+  if(digits!==generatedOtp){toast('Incorrect OTP.','#dc2626');return;}
   const d=ls();
   const isInvite=!!pendingSignupData.inviteOrgId;
   const user={
-    id:uid(),
-    userId:genUserId(pendingSignupData.role,d.users),
+    id:uid(),userId:genUserId(pendingSignupData.role,d.users),
     username:pendingSignupData.username,
-    firstName:pendingSignupData.fname,
-    lastName:pendingSignupData.lname,
-    email:pendingSignupData.email,
-    mobile:pendingSignupData.mobile,
-    dob:pendingSignupData.dob,
-    gender:pendingSignupData.gender,
+    firstName:pendingSignupData.fname,lastName:pendingSignupData.lname,
+    email:pendingSignupData.email,mobile:pendingSignupData.mobile,
+    dob:pendingSignupData.dob,gender:pendingSignupData.gender,
     role:pendingSignupData.role,
     passwordHash:btoa(pendingSignupData.pw),
-    status: isInvite ? 'active' : 'pending',
-    invitedBy: pendingSignupData.inviteOrgId||null,
+    status:isInvite?'active':'pending',
+    invitedBy:pendingSignupData.inviteOrgId||null,
     createdAt:new Date().toISOString()
   };
-  d.users.push(user);
-  sv(d);
-  if(isInvite){
-    toast('Welcome to TravelMate! You can now log in. 🎉','#16a34a');
-    setTimeout(()=>showScreen('screen-login'),1500);
-  } else {
-    document.getElementById('pending-email').textContent=user.email;
-    showScreen('screen-pending');
-  }
-  // Reset form
-  generatedOtp=null; pendingSignupData=null;
+  d.users.push(user);sv(d);
+  generatedOtp=null;pendingSignupData=null;
   [...document.querySelectorAll('.otp-digit')].forEach(i=>i.value='');
   document.getElementById('signup-step1').style.display='block';
   document.getElementById('signup-step2').style.display='none';
+  if(isInvite){toast('Welcome to TravelMate! 🎉','#16a34a');setTimeout(()=>showScreen('screen-login'),1500);}
+  else{document.getElementById('pending-email').textContent=user.email;showScreen('screen-pending');}
 }
 
 // ═══════════════════════════════════════════
 //  ADMIN DASHBOARD
 // ═══════════════════════════════════════════
 function loadAdminDash(){
-  const av=initials(currentUser.firstName);
-  document.getElementById('admin-av').textContent=av;
+  document.getElementById('admin-av').textContent=initials(currentUser.firstName);
   document.getElementById('admin-uname').textContent=currentUser.username;
   showScreen('screen-admin');
-  adminTab('pending');
   renderAdminStats();
+  adminTab('pending');
 }
 function renderAdminStats(){
   const d=ls();
   const pending=d.users.filter(u=>u.status==='pending').length;
-  const total=d.users.length;
-  const orgs=d.users.filter(u=>u.role==='organiser'&&u.status==='active').length;
-  const trvs=d.users.filter(u=>u.role==='traveller'&&u.status==='active').length;
-  const trips=d.trips.length;
   document.getElementById('admin-stats').innerHTML=`
     <div class="stat-box"><div class="sv" style="color:var(--yellow)">${pending}</div><div class="sl">Pending</div></div>
-    <div class="stat-box"><div class="sv" style="color:var(--blue)">${total}</div><div class="sl">Total Users</div></div>
-    <div class="stat-box"><div class="sv" style="color:var(--orange)">${orgs}</div><div class="sl">Organisers</div></div>
-    <div class="stat-box"><div class="sv" style="color:var(--pink)">${trvs}</div><div class="sl">Travellers</div></div>
-    <div class="stat-box"><div class="sv" style="color:var(--green)">${trips}</div><div class="sl">Trips</div></div>
+    <div class="stat-box"><div class="sv" style="color:var(--blue)">${d.users.filter(u=>u.role!=='admin').length}</div><div class="sl">Users</div></div>
+    <div class="stat-box"><div class="sv" style="color:var(--orange)">${d.users.filter(u=>u.role==='organiser'&&u.status==='active').length}</div><div class="sl">Organisers</div></div>
+    <div class="stat-box"><div class="sv" style="color:var(--pink)">${d.users.filter(u=>u.role==='traveller'&&u.status==='active').length}</div><div class="sl">Travellers</div></div>
+    <div class="stat-box"><div class="sv" style="color:var(--green)">${d.trips.length}</div><div class="sl">Trips</div></div>
   `;
 }
 function adminTab(tab){
   ['pending','users','trips'].forEach(t=>{
-    const el=document.getElementById('admin-tab-'+t);
-    if(el) el.style.display=t===tab?'block':'none';
+    document.getElementById('admin-tab-'+t).style.display=t===tab?'block':'none';
+    const btn=document.getElementById('atab-'+t);
+    if(btn){btn.className=t===tab?'btn btn-blue btn-sm':'btn btn-ghost btn-sm';}
+  });
+  // bottom nav active
+  document.querySelectorAll('#admin-bottom-nav .bn-item').forEach((el,i)=>{
+    el.classList.toggle('active',['pending','users','trips'][i]===tab);
   });
   const d=ls();
-  if(tab==='pending'){
-    const body=document.getElementById('admin-pending-body');
-    const pend=d.users.filter(u=>u.status==='pending');
-    if(!pend.length){ body.innerHTML=`<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">No pending requests 🎉</td></tr>`; return; }
-    body.innerHTML=pend.map(u=>`<tr>
-      <td>${u.firstName} ${u.lastName||''}</td>
-      <td><strong>${u.username}</strong></td>
-      <td>${u.email}</td>
-      <td>${u.mobile}</td>
-      <td><span class="badge badge-blue">${u.role}</span></td>
-      <td>${fmt(u.createdAt.split('T')[0])}</td>
-      <td style="display:flex;gap:6px;">
-        <button class="btn btn-green btn-xs" onclick="approveUser('${u.id}')">✓ Approve</button>
-        <button class="btn btn-red btn-xs" onclick="rejectUser('${u.id}')">✗ Reject</button>
-      </td>
-    </tr>`).join('');
-  } else if(tab==='users'){
-    const body=document.getElementById('admin-users-body');
-    const nonAdmin=d.users.filter(u=>u.role!=='admin');
-    if(!nonAdmin.length){ body.innerHTML=`<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px;">No users yet.</td></tr>`; return; }
-    body.innerHTML=nonAdmin.map(u=>`<tr>
-      <td><div style="display:flex;align-items:center;gap:6px;"><div class="mem-av">${initials(u.firstName)}</div>${u.firstName} ${u.lastName||''}</div></td>
-      <td><strong>${u.username}</strong><br><span style="font-size:0.7rem;color:var(--muted);">${u.userId||''}</span></td>
-      <td>${u.email}</td>
-      <td>${u.mobile}</td>
-      <td><span class="badge ${u.role==='organiser'?'badge-blue':'badge-green'}">${u.role}</span></td>
-      <td><span class="badge ${u.status==='active'?'badge-green':u.status==='pending'?'badge-yellow':'badge-red'}">${u.status}</span></td>
-      <td>${fmt(u.createdAt.split('T')[0])}</td>
-    </tr>`).join('');
-  } else if(tab==='trips'){
-    const el=document.getElementById('admin-trips-list');
-    if(!d.trips.length){ el.innerHTML=`<div class="empty-state"><span class="ei">🗺️</span><p>No trips yet.</p></div>`; return; }
-    el.innerHTML=d.trips.map(t=>{
-      const exps=d.expenses.filter(e=>e.tripId===t.id);
-      const spent=exps.reduce((s,e)=>s+(+e.amount||0),0);
-      const org=d.users.find(u=>u.id===t.organiserId);
-      return `<div class="card" style="margin-bottom:12px;">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-          <div>
-            <div style="font-family:'Pacifico',cursive;font-size:1.1rem;color:var(--blue2);">${t.name}</div>
-            <div style="font-size:0.8rem;color:var(--muted);font-weight:600;margin-top:3px;">📅 ${fmt(t.start)} → ${fmt(t.end)} &nbsp;·&nbsp; 👥 ${t.travellers.length} travellers &nbsp;·&nbsp; By: ${org?org.firstName:'—'}</div>
+  if(tab==='pending') renderAdminPending(d);
+  else if(tab==='users') renderAdminUsers(d);
+  else if(tab==='trips') renderAdminTrips(d);
+}
+
+function renderAdminPending(d){
+  const pend=d.users.filter(u=>u.status==='pending');
+  const el=document.getElementById('admin-pending-content');
+  if(!pend.length){el.innerHTML=`<div class="empty-state"><span class="ei">🎉</span><p>No pending requests!</p></div>`;return;}
+  // Mobile: cards; Desktop: table
+  el.innerHTML=`
+    <div class="tbl-wrap" style="display:none;" class="desktop-only" id="pend-tbl-wrap">
+      <table class="dtbl">
+        <thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Action</th></tr></thead>
+        <tbody>${pend.map(u=>`<tr>
+          <td>${u.firstName} ${u.lastName||''}</td>
+          <td><strong>${u.username}</strong></td>
+          <td>${u.email}</td>
+          <td><span class="badge badge-blue">${u.role}</span></td>
+          <td style="display:flex;gap:6px;">
+            <button class="btn btn-green btn-xs" onclick="approveUser('${u.id}')">✓ Approve</button>
+            <button class="btn btn-red btn-xs" onclick="rejectUser('${u.id}')">✗ Reject</button>
+          </td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+    ${pend.map(u=>`
+      <div class="user-card-mobile">
+        <div class="ucm-top">
+          <div class="mem-av">${initials(u.firstName)}</div>
+          <div class="ucm-info">
+            <div class="ucm-name">${u.firstName} ${u.lastName||''}</div>
+            <div class="ucm-uname">${u.username} · ${u.email}</div>
           </div>
-          <div style="display:flex;gap:7px;align-items:center;">
-            <span style="font-weight:800;color:var(--orange);">₹${spent.toLocaleString('en-IN')}</span>
-            <button class="btn btn-blue btn-xs" onclick="adminExportTripPdf('${t.id}')">📄 PDF</button>
-            <button class="btn btn-red btn-xs" onclick="adminDeleteTrip('${t.id}')">🗑 Delete</button>
+          <span class="badge badge-blue">${u.role}</span>
+        </div>
+        <div class="ucm-actions">
+          <button class="btn btn-green btn-sm" onclick="approveUser('${u.id}')">✓ Approve</button>
+          <button class="btn btn-red btn-sm" onclick="rejectUser('${u.id}')">✗ Reject</button>
+        </div>
+      </div>`).join('')}
+  `;
+}
+
+function renderAdminUsers(d){
+  const users=d.users.filter(u=>u.role!=='admin');
+  const el=document.getElementById('admin-users-content');
+  if(!users.length){el.innerHTML=`<div class="empty-state"><span class="ei">👥</span><p>No users yet.</p></div>`;return;}
+  el.innerHTML=users.map(u=>`
+    <div class="user-card-mobile">
+      <div class="ucm-top">
+        <div class="mem-av" style="background:${u.role==='organiser'?'linear-gradient(135deg,#3b82f6,#1d4ed8)':'linear-gradient(135deg,#22c55e,#16a34a)'}">${initials(u.firstName)}</div>
+        <div class="ucm-info">
+          <div class="ucm-name">${u.firstName} ${u.lastName||''}</div>
+          <div class="ucm-uname">${u.username} · ${u.userId||''}</div>
+          <div style="font-size:0.7rem;color:var(--muted);margin-top:2px;">${u.email} · ${u.mobile||''}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span class="badge ${u.role==='organiser'?'badge-blue':'badge-green'}">${u.role}</span>
+          <span class="badge ${u.status==='active'?'badge-green':u.status==='pending'?'badge-yellow':'badge-red'}">${u.status}</span>
+        </div>
+        <div style="display:flex;gap:6px;">
+          ${u.status==='pending'?`<button class="btn btn-green btn-xs" onclick="approveUser('${u.id}')">✓ Approve</button>`:''}
+          ${u.status==='active'?`<button class="btn btn-ghost btn-xs" style="color:var(--red);border-color:var(--red);" onclick="suspendUser('${u.id}')">Suspend</button>`:''}
+          <button class="btn btn-red btn-xs" onclick="deleteUser('${u.id}','${u.firstName}')">🗑 Delete</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderAdminTrips(d){
+  const el=document.getElementById('admin-trips-content');
+  if(!d.trips.length){el.innerHTML=`<div class="empty-state"><span class="ei">🗺️</span><p>No trips yet.</p></div>`;return;}
+  el.innerHTML=d.trips.map(t=>{
+    const exps=d.expenses.filter(e=>e.tripId===t.id);
+    const spent=exps.reduce((s,e)=>s+(+e.amount||0),0);
+    const org=d.users.find(u=>u.id===t.organiserId);
+    return `<div class="card" style="margin-bottom:12px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div style="font-family:var(--font-display);font-size:1rem;color:var(--blue2);">${t.name}</div>
+          <div style="font-size:0.78rem;color:var(--muted);font-weight:600;margin-top:3px;">
+            📅 ${fmt(t.start)} → ${fmt(t.end)} · 👥 ${t.travellers.length} pax · By: ${org?org.firstName:'—'}
           </div>
         </div>
-      </div>`;
-    }).join('');
-  }
+        <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;">
+          <span style="font-weight:900;color:var(--orange);font-size:0.9rem;">₹${spent.toLocaleString('en-IN')}</span>
+          <button class="btn btn-blue btn-xs" onclick="generatePdf('${t.id}')">📄 PDF</button>
+          <button class="btn btn-red btn-xs" onclick="adminDeleteTrip('${t.id}')">🗑 Delete</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
-function approveUser(uid){
-  const d=ls();
-  const u=d.users.find(x=>x.id===uid);
-  if(!u) return;
-  u.status='active';
-  sv(d);
+
+function approveUser(id){
+  const d=ls();const u=d.users.find(x=>x.id===id);if(!u)return;
+  u.status='active';sv(d);
   toast(`✓ ${u.firstName} approved! Username: ${u.username}`,'#16a34a');
-  adminTab('pending');
-  renderAdminStats();
+  renderAdminStats();adminTab('pending');
 }
-function rejectUser(uid){
-  if(!confirm('Reject this user?')) return;
+function rejectUser(id){
+  if(!confirm('Reject this user?'))return;
+  const d=ls();const u=d.users.find(x=>x.id===id);if(!u)return;
+  u.status='rejected';sv(d);
+  toast('User rejected.','#dc2626');renderAdminStats();adminTab('pending');
+}
+function suspendUser(id){
+  if(!confirm('Suspend this user? They won\'t be able to login.'))return;
+  const d=ls();const u=d.users.find(x=>x.id===id);if(!u)return;
+  u.status='suspended';sv(d);
+  toast(`${u.firstName} suspended.`,'#d97706');renderAdminStats();adminTab('users');
+}
+function deleteUser(id,name){
+  if(!confirm(`Permanently delete user "${name}"? This cannot be undone.`))return;
   const d=ls();
-  const u=d.users.find(x=>x.id===uid);
-  if(!u) return;
-  u.status='rejected';
+  d.users=d.users.filter(u=>u.id!==id);
   sv(d);
-  toast('User rejected.','#dc2626');
-  adminTab('pending');
-  renderAdminStats();
+  toast(`${name} deleted.`,'#dc2626');renderAdminStats();adminTab('users');
 }
 function adminDeleteTrip(tid){
-  if(!confirm('Delete this trip and all its expenses?')) return;
+  if(!confirm('Delete this trip and all its expenses?'))return;
   const d=ls();
   d.trips=d.trips.filter(t=>t.id!==tid);
   d.expenses=d.expenses.filter(e=>e.tripId!==tid);
   d.notes=(d.notes||[]).filter(n=>n.tripId!==tid);
-  sv(d);
-  toast('Trip deleted.','#dc2626');
-  adminTab('trips');
-  renderAdminStats();
+  sv(d);toast('Trip deleted.','#dc2626');renderAdminStats();adminTab('trips');
 }
 
 // ═══════════════════════════════════════════
-//  ORGANISER DASHBOARD
+//  ORGANISER
 // ═══════════════════════════════════════════
 function loadOrgDash(){
   document.getElementById('org-av').textContent=initials(currentUser.firstName);
   document.getElementById('org-uname').textContent=currentUser.username;
-  showScreen('screen-organiser');
-  renderOrgTrips();
+  showScreen('screen-organiser');renderOrgTrips();
 }
 function renderOrgTrips(){
   document.getElementById('org-trips-view').style.display='block';
@@ -1135,154 +1292,114 @@ function renderOrgTrips(){
   const d=ls();
   const myTrips=d.trips.filter(t=>t.organiserId===currentUser.id);
   const grid=document.getElementById('org-trips-grid');
-  if(!myTrips.length){
-    grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1"><span class="ei">✈️</span><p>No trips yet.<br>Click <strong>+ New Trip</strong>!</p></div>`;
-    return;
-  }
+  if(!myTrips.length){grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1"><span class="ei">✈️</span><p>No trips yet.<br>Tap <strong>+ New Trip</strong>!</p></div>`;return;}
   grid.innerHTML=myTrips.map(t=>{
     const exps=d.expenses.filter(e=>e.tripId===t.id);
     const spent=exps.reduce((s,e)=>s+(+e.amount||0),0);
     return `<div class="trip-card-item" onclick="openOrgTripDetail('${t.id}')">
       <div class="tc-name">${t.name}</div>
       <div class="tc-dates">📅 ${fmt(t.start)} → ${fmt(t.end)}</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
         <span class="badge badge-blue">☀️ ${t.days}D / 🌙 ${t.nights}N</span>
         <span class="badge badge-orange">👥 ${t.travellers.length} pax</span>
       </div>
       <div class="tc-bottom">
-        <span style="font-weight:800;color:var(--orange);">₹${spent.toLocaleString('en-IN')}</span>
-        <span style="font-size:0.78rem;color:var(--muted);font-weight:600;">${exps.length} expense${exps.length!==1?'s':''}</span>
+        <span style="font-weight:900;color:var(--orange);font-size:0.95rem;">₹${spent.toLocaleString('en-IN')}</span>
+        <span style="font-size:0.75rem;color:var(--muted);font-weight:600;">${exps.length} expense${exps.length!==1?'s':''}</span>
       </div>
     </div>`;
   }).join('');
 }
-
 function openOrgTripDetail(tid){
   activeTripId=tid;
   document.getElementById('org-trips-view').style.display='none';
-  const detailEl=document.getElementById('org-detail-view');
-  detailEl.style.display='block';
+  document.getElementById('org-detail-view').style.display='block';
   renderOrgDetail();
 }
-
 function renderOrgDetail(){
   const d=ls();
-  const trip=d.trips.find(t=>t.id===activeTripId);
-  if(!trip) return;
+  const trip=d.trips.find(t=>t.id===activeTripId);if(!trip)return;
   const exps=d.expenses.filter(e=>e.tripId===activeTripId);
   const notes=(d.notes||[]).filter(n=>n.tripId===activeTripId);
   const totalSpent=exps.reduce((s,e)=>s+(+e.amount||0),0);
   const perHead=trip.travellers.length?Math.round(totalSpent/trip.travellers.length):0;
-
-  const detailEl=document.getElementById('org-detail-view');
-  detailEl.innerHTML=`
+  const el=document.getElementById('org-detail-view');
+  el.innerHTML=`
     <div class="back-btn" onclick="renderOrgTrips()">← Back to Trips</div>
     <div class="card">
-      <h2 style="font-family:'Pacifico',cursive;color:var(--blue2);font-size:1.6rem;margin-bottom:8px;">${trip.name}</h2>
-      <div style="display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:0.83rem;font-weight:600;margin-bottom:14px;">
+      <h2 style="font-family:var(--font-display);color:var(--blue2);font-size:1.45rem;margin-bottom:8px;">${trip.name}</h2>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:0.82rem;font-weight:600;margin-bottom:14px;">
         ${trip.start?`<span>📅 ${fmt(trip.start)} → ${fmt(trip.end)}</span>`:''}
-        <span>☀️ ${trip.days} Days / 🌙 ${trip.nights} Nights</span>
+        <span>☀️ ${trip.days}D / 🌙 ${trip.nights}N</span>
         <span>👥 ${trip.travellers.length} Travellers</span>
-        ${trip.budget?`<span>💰 Budget: ₹${Number(trip.budget).toLocaleString('en-IN')}</span>`:''}
+        ${trip.budget?`<span>💰 ₹${Number(trip.budget).toLocaleString('en-IN')}</span>`:''}
       </div>
-      <!-- Invite Link -->
-      <div>
-        <div style="font-size:0.78rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.7px;margin-bottom:6px;">🔗 Invite Link</div>
-        <div class="invite-link-box">
-          <div class="link-text" id="inv-link-text">${window.location.origin}${window.location.pathname}?invite=${currentUser.id}</div>
-          <button class="btn btn-blue btn-sm" onclick="copyInviteLink()">📋 Copy</button>
-        </div>
-        <div style="font-size:0.73rem;color:var(--muted);font-weight:600;margin-top:6px;">Share this link. Anyone who signs up via this link will be auto-approved as Traveller under your trips.</div>
+      <div style="margin-bottom:4px;font-size:0.72rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.7px;">🔗 Invite Link</div>
+      <div class="invite-link-box">
+        <div class="link-text" id="inv-link-text">${window.location.origin}${window.location.pathname}?invite=${currentUser.id}</div>
+        <button class="btn btn-blue btn-sm" onclick="copyInviteLink()">📋 Copy</button>
       </div>
     </div>
-
-    <!-- Summary -->
     <div class="stats-row">
       <div class="stat-box"><div class="sv" style="color:var(--orange);">₹${totalSpent.toLocaleString('en-IN')}</div><div class="sl">Total Spent</div></div>
       <div class="stat-box"><div class="sv" style="color:var(--blue);">₹${perHead.toLocaleString('en-IN')}</div><div class="sl">Per Person</div></div>
       ${trip.budget?`<div class="stat-box"><div class="sv" style="color:${totalSpent>trip.budget?'var(--red)':'var(--green)'};">₹${Math.abs(trip.budget-totalSpent).toLocaleString('en-IN')}</div><div class="sl">${totalSpent>trip.budget?'Over Budget':'Remaining'}</div></div>`:''}
       <div class="stat-box"><div class="sv" style="color:var(--pink);">${exps.length}</div><div class="sl">Expenses</div></div>
     </div>
-
-    <!-- Members -->
     <div class="card">
       <div class="card-title">👥 Travellers & Advance</div>
-      <div class="tbl-wrap">
-        <table class="dtbl">
-          <thead><tr><th>Name</th><th>Username</th><th>Share (₹)</th><th>Advance (₹)</th><th>Balance</th></tr></thead>
-          <tbody id="mem-tbody"></tbody>
-        </table>
-      </div>
-      <div style="font-size:0.72rem;color:var(--muted);margin-top:8px;font-weight:600;">✏️ Edit advance directly in the table.</div>
+      <div class="tbl-wrap"><table class="dtbl" style="min-width:380px;">
+        <thead><tr><th>Name</th><th>Share</th><th>Advance (₹)</th><th>Balance</th></tr></thead>
+        <tbody id="mem-tbody"></tbody>
+      </table></div>
+      <div style="font-size:0.7rem;color:var(--muted);margin-top:8px;font-weight:600;">✏️ Edit advance directly in table</div>
     </div>
-
-    <!-- Expenses -->
     <div class="card">
       <div class="sec-head">
         <div class="card-title" style="margin-bottom:0;">💸 Expenses</div>
-        <div style="display:flex;gap:8px;">
+        <div style="display:flex;gap:7px;flex-wrap:wrap;">
           <button class="btn btn-orange btn-sm" onclick="openAddExpModal()">＋ Add</button>
-          <button class="btn btn-blue btn-sm" onclick="exportTripPdf('${trip.id}')">📄 PDF</button>
+          <button class="btn btn-blue btn-sm" onclick="generatePdf('${trip.id}')">📄 PDF</button>
           <button class="btn btn-red btn-sm" onclick="orgDeleteTrip('${trip.id}')">🗑 Delete</button>
         </div>
       </div>
       <div id="exp-list" style="margin-top:14px;"></div>
     </div>
-
-    <!-- Notes from travellers -->
     <div class="card">
       <div class="card-title">📝 Notes from Travellers</div>
       <div id="notes-list"></div>
     </div>
   `;
-
-  // Render members
   renderMemberTable(trip,perHead,d);
-  // Render expenses
   renderExpList(exps,'exp-list',true);
-  // Render notes
   renderNotesList(notes,'notes-list');
 }
-
 function renderMemberTable(trip,perHead,d){
-  const tbody=document.getElementById('mem-tbody');
-  if(!tbody) return;
+  const tbody=document.getElementById('mem-tbody');if(!tbody)return;
   tbody.innerHTML=trip.travellers.map((m,i)=>{
-    const adv=+m.advance||0;
-    const bal=perHead-adv;
+    const adv=+m.advance||0,bal=perHead-adv;
     const balStyle=bal>0?'color:var(--red);':'color:var(--green);';
     const balStr=bal>0?`Owes ₹${bal.toLocaleString('en-IN')}`:(bal<0?`Overpaid ₹${Math.abs(bal).toLocaleString('en-IN')}`:'✓ Settled');
-    const user=d.users.find(u=>u.id===m.userId);
     return `<tr>
       <td><div style="display:flex;align-items:center;"><div class="mem-av">${initials(m.name)}</div>${m.name}</div></td>
-      <td style="font-size:0.78rem;color:var(--muted);">${user?user.username:'—'}</td>
       <td>₹${perHead.toLocaleString('en-IN')}</td>
-      <td><input class="adv-input" type="number" value="${adv}" min="0" onchange="updateAdvance(${i},this.value)" oninput="updateAdvance(${i},this.value)"></td>
-      <td style="${balStyle}font-weight:800;">${balStr}</td>
+      <td><input class="adv-input" type="number" value="${adv}" min="0" inputmode="decimal" onchange="updateAdvance(${i},this.value)" oninput="updateAdvance(${i},this.value)"></td>
+      <td style="${balStyle}font-weight:800;font-size:0.82rem;">${balStr}</td>
     </tr>`;
   }).join('');
 }
-
 function updateAdvance(idx,val){
-  const d=ls();
-  const trip=d.trips.find(t=>t.id===activeTripId);
-  if(!trip||!trip.travellers[idx]) return;
-  trip.travellers[idx].advance=+val||0;
-  sv(d);
-  // Recalc and refresh member table
+  const d=ls();const trip=d.trips.find(t=>t.id===activeTripId);
+  if(!trip||!trip.travellers[idx])return;
+  trip.travellers[idx].advance=+val||0;sv(d);
   const exps=d.expenses.filter(e=>e.tripId===activeTripId);
   const totalSpent=exps.reduce((s,e)=>s+(+e.amount||0),0);
   const perHead=trip.travellers.length?Math.round(totalSpent/trip.travellers.length):0;
   renderMemberTable(trip,perHead,d);
 }
-
-function renderExpList(exps,containerId,canDelete){
-  const el=document.getElementById(containerId);
-  if(!el) return;
-  if(!exps.length){
-    el.innerHTML=`<div class="empty-state" style="padding:24px 0;"><span class="ei" style="font-size:2rem;">🧾</span><p>No expenses yet.</p></div>`;
-    return;
-  }
+function renderExpList(exps,cid,canDelete){
+  const el=document.getElementById(cid);if(!el)return;
+  if(!exps.length){el.innerHTML=`<div class="empty-state" style="padding:20px 0;"><span class="ei" style="font-size:2rem;">🧾</span><p>No expenses yet.</p></div>`;return;}
   el.innerHTML=exps.slice().reverse().map(e=>`
     <div class="exp-item">
       <div class="exp-icon" style="background:${catBg(e.cat)}">${catIcon(e.cat)}</div>
@@ -1291,88 +1408,72 @@ function renderExpList(exps,containerId,canDelete){
         <div class="exp-note">${e.note||'—'}</div>
         ${e.paidBy?`<div class="exp-sub">Paid by: ${e.paidBy}</div>`:''}
       </div>
-      ${e.date?`<div style="font-size:0.73rem;color:var(--muted);font-weight:600;">${fmtShort(e.date)}</div>`:''}
+      ${e.date?`<div style="font-size:0.7rem;color:var(--muted);font-weight:600;white-space:nowrap;">${fmtShort(e.date)}</div>`:''}
       <div class="exp-amt">₹${(+e.amount).toLocaleString('en-IN')}</div>
-      ${canDelete?`<button class="btn btn-ghost btn-xs" style="color:var(--red);border-color:var(--red);" onclick="deleteExpense('${e.id}')">✕</button>`:''}
+      ${canDelete?`<button class="btn btn-ghost btn-xs" style="color:var(--red);border-color:var(--red);flex-shrink:0;" onclick="deleteExpense('${e.id}')">✕</button>`:''}
     </div>`).join('');
 }
-
-function renderNotesList(notes,containerId){
-  const el=document.getElementById(containerId);
-  if(!el) return;
-  if(!notes.length){ el.innerHTML=`<div style="color:var(--muted);font-size:0.85rem;font-weight:600;">No notes yet from travellers.</div>`; return; }
+function renderNotesList(notes,cid){
+  const el=document.getElementById(cid);if(!el)return;
+  if(!notes.length){el.innerHTML=`<div style="color:var(--muted);font-size:0.85rem;font-weight:600;">No notes from travellers yet.</div>`;return;}
   el.innerHTML=notes.map(n=>`
     <div class="note-item">
       <div class="note-by">✏️ ${n.by} · ${fmt(n.date)}</div>
       <div class="note-text">${n.text}</div>
     </div>`).join('');
 }
-
 function orgDeleteTrip(tid){
-  if(!confirm('Delete this trip?')) return;
+  if(!confirm('Delete this trip?'))return;
   const d=ls();
   d.trips=d.trips.filter(t=>t.id!==tid);
   d.expenses=d.expenses.filter(e=>e.tripId!==tid);
   d.notes=(d.notes||[]).filter(n=>n.tripId!==tid);
-  sv(d);
-  toast('Trip deleted.','#dc2626');
-  renderOrgTrips();
+  sv(d);toast('Trip deleted.','#dc2626');renderOrgTrips();
 }
-
 function copyInviteLink(){
   const link=document.getElementById('inv-link-text').textContent;
-  navigator.clipboard.writeText(link).then(()=>toast('Invite link copied! 📋','#16a34a'));
+  navigator.clipboard.writeText(link).then(()=>toast('Invite link copied! 📋','#16a34a'))
+    .catch(()=>{
+      const ta=document.createElement('textarea');ta.value=link;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+      toast('Invite link copied! 📋','#16a34a');
+    });
 }
-
-// ── New Trip Modal ──
 function nt_calcDays(){
-  const s=document.getElementById('nt-start').value;
-  const e=document.getElementById('nt-end').value;
-  if(s&&e){
-    const diff=Math.round((new Date(e)-new Date(s))/86400000);
-    if(diff>=0){ document.getElementById('nt-days').value=diff+1; document.getElementById('nt-nights').value=diff; }
-  }
+  const s=document.getElementById('nt-start').value,e=document.getElementById('nt-end').value;
+  if(s&&e){const diff=Math.round((new Date(e)-new Date(s))/86400000);
+    if(diff>=0){document.getElementById('nt-days').value=diff+1;document.getElementById('nt-nights').value=diff;}}
 }
 function openModal(id){
   if(id==='modal-new-trip'){
-    // Load available travellers
     const d=ls();
-    const travellers=d.users.filter(u=>u.role==='traveller'&&u.status==='active'&&(u.invitedBy===currentUser.id||true));
-    const container=document.getElementById('nt-travellers-available');
+    const travs=d.users.filter(u=>u.role==='traveller'&&u.status==='active');
+    const c=document.getElementById('nt-travellers-available');
     selectedTravellers=[];
-    if(!travellers.length){
-      container.innerHTML=`<span style="font-size:0.8rem;color:var(--muted);">No approved travellers yet. Share your invite link!</span>`;
-    } else {
-      container.innerHTML=travellers.map(t=>`
-        <div class="trav-row" id="tsel-${t.id}" onclick="toggleTravellerSel('${t.id}','${t.firstName} ${t.lastName||''}')">
-          <div class="mem-av" style="margin-right:0;">${initials(t.firstName)}</div>
-          <span class="tname">${t.firstName} ${t.lastName||''}</span>
-          <span style="margin-left:6px;font-size:0.8rem;color:var(--muted);">${t.username}</span>
-        </div>`).join('');
-    }
+    if(!travs.length){c.innerHTML=`<span style="font-size:0.8rem;color:var(--muted);font-weight:600;">No approved travellers yet. Share invite link!</span>`;
+    }else{c.innerHTML=travs.map(t=>`
+      <div id="tsel-${t.id}" onclick="toggleTravellerSel('${t.id}','${t.firstName} ${t.lastName||''}','${t.id}')"
+        style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--light);border:1.5px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px;transition:all 0.2s;">
+        <div class="mem-av" style="margin-right:0;">${initials(t.firstName)}</div>
+        <div><div style="font-size:0.88rem;font-weight:700;">${t.firstName} ${t.lastName||''}</div>
+        <div style="font-size:0.72rem;color:var(--muted);">${t.username}</div></div>
+      </div>`).join('');}
     document.getElementById('nt-start').value=new Date().toISOString().split('T')[0];
   }
   document.getElementById(id).classList.add('open');
 }
-function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+function closeModal(id){document.getElementById(id).classList.remove('open');}
 function toggleTravellerSel(uid,name){
   const el=document.getElementById('tsel-'+uid);
   const idx=selectedTravellers.findIndex(t=>t.userId===uid);
-  if(idx>-1){
-    selectedTravellers.splice(idx,1);
-    el.style.background='';el.style.borderColor='';
-  } else {
-    selectedTravellers.push({userId:uid,name,advance:0});
-    el.style.background='var(--blue-light)';el.style.borderColor='var(--blue)';
-  }
+  if(idx>-1){selectedTravellers.splice(idx,1);el.style.background='';el.style.borderColor='';}
+  else{selectedTravellers.push({userId:uid,name,advance:0});el.style.background='var(--blue-light)';el.style.borderColor='var(--blue)';}
 }
 function saveNewTrip(){
   const name=document.getElementById('nt-name').value.trim();
-  if(!name){ toast('Enter trip name!','#dc2626'); return; }
+  if(!name){toast('Enter trip name!','#dc2626');return;}
   const d=ls();
   const trip={
-    id:uid(),
-    name,
+    id:uid(),name,
     start:document.getElementById('nt-start').value,
     end:document.getElementById('nt-end').value,
     days:+document.getElementById('nt-days').value||1,
@@ -1380,74 +1481,49 @@ function saveNewTrip(){
     budget:document.getElementById('nt-budget').value||null,
     notes:document.getElementById('nt-notes').value,
     travellers:selectedTravellers,
-    organiserId:currentUser.id,
-    createdAt:new Date().toISOString()
+    organiserId:currentUser.id,createdAt:new Date().toISOString()
   };
-  d.trips.unshift(trip);
-  sv(d);
-  closeModal('modal-new-trip');
-  // clear form
+  d.trips.unshift(trip);sv(d);closeModal('modal-new-trip');
   ['nt-name','nt-budget','nt-notes'].forEach(i=>document.getElementById(i).value='');
   selectedTravellers=[];
-  toast('Trip created! 🎉','#16a34a');
-  renderOrgTrips();
+  toast('Trip created! 🎉','#16a34a');renderOrgTrips();
 }
-
-// ── Expense ──
 function openAddExpModal(){
-  const d=ls();
-  const trip=d.trips.find(t=>t.id===activeTripId);
-  if(!trip) return;
+  const d=ls();const trip=d.trips.find(t=>t.id===activeTripId);if(!trip)return;
   const pb=document.getElementById('ae-paidby');
-  pb.innerHTML='<option value="">-- Select --</option>'+
-    trip.travellers.map(m=>`<option>${m.name}</option>`).join('');
-  const sc=document.getElementById('ae-split-checks');
-  sc.innerHTML=trip.travellers.map(m=>`
-    <label style="display:flex;align-items:center;gap:5px;background:var(--light);border:1.5px solid var(--border);
-      border-radius:8px;padding:5px 10px;cursor:pointer;font-size:0.82rem;font-weight:700;">
-      <input type="checkbox" value="${m.name}" style="accent-color:var(--blue)"> ${m.name}
+  pb.innerHTML='<option value="">-- Select --</option>'+trip.travellers.map(m=>`<option>${m.name}</option>`).join('');
+  document.getElementById('ae-split-checks').innerHTML=trip.travellers.map(m=>`
+    <label style="display:flex;align-items:center;gap:5px;background:var(--light);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:0.82rem;font-weight:700;font-family:var(--font);">
+      <input type="checkbox" value="${m.name}" style="accent-color:var(--blue);width:16px;height:16px;"> ${m.name}
     </label>`).join('');
   document.getElementById('ae-date').value=trip.start||new Date().toISOString().split('T')[0];
   openModal('modal-add-expense');
 }
 function saveExpense(){
-  const cat=document.getElementById('ae-cat').value;
-  const amount=document.getElementById('ae-amount').value;
-  if(!cat||!amount){ toast('Category and amount required!','#dc2626'); return; }
+  const cat=document.getElementById('ae-cat').value,amount=document.getElementById('ae-amount').value;
+  if(!cat||!amount){toast('Category and amount required!','#dc2626');return;}
   const checked=[...document.querySelectorAll('#ae-split-checks input:checked')].map(c=>c.value);
   const d=ls();
-  d.expenses.push({
-    id:uid(),tripId:activeTripId,cat,
-    note:document.getElementById('ae-note').value,
-    amount:+amount,
-    date:document.getElementById('ae-date').value,
-    paidBy:document.getElementById('ae-paidby').value,
-    splitAmong:checked,
-    createdAt:new Date().toISOString()
-  });
-  sv(d);
-  closeModal('modal-add-expense');
+  d.expenses.push({id:uid(),tripId:activeTripId,cat,note:document.getElementById('ae-note').value,
+    amount:+amount,date:document.getElementById('ae-date').value,
+    paidBy:document.getElementById('ae-paidby').value,splitAmong:checked,createdAt:new Date().toISOString()});
+  sv(d);closeModal('modal-add-expense');
   ['ae-note','ae-amount'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('ae-cat').selectedIndex=0;
-  toast('Expense added ✓','#16a34a');
-  renderOrgDetail();
+  toast('Expense added ✓','#16a34a');renderOrgDetail();
 }
 function deleteExpense(eid){
-  const d=ls();
-  d.expenses=d.expenses.filter(e=>e.id!==eid);
-  sv(d);
-  toast('Expense removed.','#dc2626');
-  renderOrgDetail();
+  const d=ls();d.expenses=d.expenses.filter(e=>e.id!==eid);sv(d);
+  toast('Expense removed.','#dc2626');renderOrgDetail();
 }
 
 // ═══════════════════════════════════════════
-//  TRAVELLER DASHBOARD
+//  TRAVELLER
 // ═══════════════════════════════════════════
 function loadTrvDash(){
   document.getElementById('trv-av').textContent=initials(currentUser.firstName);
   document.getElementById('trv-uname').textContent=currentUser.username;
-  showScreen('screen-traveller');
-  renderTrvTrips();
+  showScreen('screen-traveller');renderTrvTrips();
 }
 function renderTrvTrips(){
   document.getElementById('trv-trips-view').style.display='block';
@@ -1455,10 +1531,7 @@ function renderTrvTrips(){
   const d=ls();
   const myTrips=d.trips.filter(t=>t.travellers.some(m=>m.userId===currentUser.id));
   const grid=document.getElementById('trv-trips-grid');
-  if(!myTrips.length){
-    grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1"><span class="ei">🎒</span><p>You haven't been added to any trips yet.<br>Ask your Trip Organiser to add you!</p></div>`;
-    return;
-  }
+  if(!myTrips.length){grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1"><span class="ei">🎒</span><p>Not added to any trips yet.<br>Ask your Organiser!</p></div>`;return;}
   grid.innerHTML=myTrips.map(t=>{
     const exps=d.expenses.filter(e=>e.tripId===t.id);
     const spent=exps.reduce((s,e)=>s+(+e.amount||0),0);
@@ -1466,12 +1539,12 @@ function renderTrvTrips(){
     return `<div class="trip-card-item" onclick="openTrvDetail('${t.id}')">
       <div class="tc-name">${t.name}</div>
       <div class="tc-dates">📅 ${fmt(t.start)} → ${fmt(t.end)}</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
         <span class="badge badge-blue">☀️ ${t.days}D / 🌙 ${t.nights}N</span>
         <span class="badge badge-green">👥 ${t.travellers.length} pax</span>
       </div>
       <div class="tc-bottom">
-        <span style="font-weight:800;color:var(--orange);">My share: ₹${perHead.toLocaleString('en-IN')}</span>
+        <span style="font-weight:900;color:var(--orange);font-size:0.9rem;">My share: ₹${perHead.toLocaleString('en-IN')}</span>
         <span class="badge badge-blue">View →</span>
       </div>
     </div>`;
@@ -1484,45 +1557,37 @@ function openTrvDetail(tid){
   renderTrvDetail();
 }
 function renderTrvDetail(){
-  const d=ls();
-  const trip=d.trips.find(t=>t.id===activeTripId);
-  if(!trip) return;
+  const d=ls();const trip=d.trips.find(t=>t.id===activeTripId);if(!trip)return;
   const exps=d.expenses.filter(e=>e.tripId===activeTripId);
   const totalSpent=exps.reduce((s,e)=>s+(+e.amount||0),0);
   const perHead=trip.travellers.length?Math.round(totalSpent/trip.travellers.length):0;
   const me=trip.travellers.find(m=>m.userId===currentUser.id);
-  const adv=me?+me.advance||0:0;
-  const bal=perHead-adv;
-
+  const adv=me?+me.advance||0:0,bal=perHead-adv;
   document.getElementById('trv-detail-view').innerHTML=`
     <div class="back-btn" onclick="renderTrvTrips()">← Back to Trips</div>
     <div class="card">
-      <h2 style="font-family:'Pacifico',cursive;color:var(--blue2);font-size:1.5rem;margin-bottom:8px;">${trip.name}</h2>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:0.82rem;font-weight:600;">
+      <h2 style="font-family:var(--font-display);color:var(--blue2);font-size:1.4rem;margin-bottom:8px;">${trip.name}</h2>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:0.8rem;font-weight:600;">
         ${trip.start?`<span>📅 ${fmt(trip.start)} → ${fmt(trip.end)}</span>`:''}
-        <span>☀️ ${trip.days} Days / 🌙 ${trip.nights} Nights</span>
-        <span>👥 ${trip.travellers.length} pax</span>
+        <span>☀️ ${trip.days}D / 🌙 ${trip.nights}N</span><span>👥 ${trip.travellers.length} pax</span>
       </div>
     </div>
-    <!-- My summary -->
     <div class="stats-row">
       <div class="stat-box"><div class="sv" style="color:var(--orange);">₹${totalSpent.toLocaleString('en-IN')}</div><div class="sl">Total Spent</div></div>
       <div class="stat-box"><div class="sv" style="color:var(--blue);">₹${perHead.toLocaleString('en-IN')}</div><div class="sl">My Share</div></div>
       <div class="stat-box"><div class="sv" style="color:var(--green);">₹${adv.toLocaleString('en-IN')}</div><div class="sl">My Advance</div></div>
-      <div class="stat-box"><div class="sv" style="color:${bal>0?'var(--red)':'var(--green)'};">₹${Math.abs(bal).toLocaleString('en-IN')}</div><div class="sl">${bal>0?'I Owe':'I Overpaid'}</div></div>
+      <div class="stat-box"><div class="sv" style="color:${bal>0?'var(--red)':'var(--green)'};">₹${Math.abs(bal).toLocaleString('en-IN')}</div><div class="sl">${bal>0?'I Owe':'Overpaid'}</div></div>
     </div>
-    <!-- Expenses read-only -->
     <div class="card">
       <div class="card-title">💸 Trip Expenses</div>
       <div id="trv-exp-list"></div>
     </div>
-    <!-- Notes -->
     <div class="card">
       <div class="sec-head">
-        <div class="card-title" style="margin-bottom:0;">📝 Add Note for Organiser</div>
+        <div class="card-title" style="margin-bottom:0;">📝 My Notes</div>
         <button class="btn btn-blue btn-sm" onclick="openModal('modal-add-note')">＋ Note</button>
       </div>
-      <div id="trv-notes-list" style="margin-top:12px;"></div>
+      <div id="trv-notes-list" style="margin-top:10px;"></div>
     </div>
   `;
   renderExpList(exps,'trv-exp-list',false);
@@ -1531,151 +1596,124 @@ function renderTrvDetail(){
 }
 function saveNote(){
   const text=document.getElementById('note-text').value.trim();
-  if(!text){ toast('Enter a note!','#dc2626'); return; }
-  const d=ls();
-  if(!d.notes) d.notes=[];
-  d.notes.push({
-    id:uid(),tripId:activeTripId,
-    by:`${currentUser.firstName} ${currentUser.lastName||''}`,
-    byId:currentUser.id,text,
-    date:new Date().toISOString().split('T')[0]
-  });
-  sv(d);
-  closeModal('modal-add-note');
+  if(!text){toast('Enter a note!','#dc2626');return;}
+  const d=ls();if(!d.notes)d.notes=[];
+  d.notes.push({id:uid(),tripId:activeTripId,by:`${currentUser.firstName} ${currentUser.lastName||''}`,byId:currentUser.id,text,date:new Date().toISOString().split('T')[0]});
+  sv(d);closeModal('modal-add-note');
   document.getElementById('note-text').value='';
-  toast('Note sent to organiser 📨','#16a34a');
-  renderTrvDetail();
+  toast('Note sent! 📨','#16a34a');
+  if(currentUser.role==='traveller') renderTrvDetail();
 }
 
 // ═══════════════════════════════════════════
 //  PDF EXPORT
 // ═══════════════════════════════════════════
-function exportTripPdf(tid){ generatePdf(tid); }
-function adminExportTripPdf(tid){ generatePdf(tid); }
 function generatePdf(tid){
-  const d=ls();
-  const trip=d.trips.find(t=>t.id===tid);
-  if(!trip){ toast('Trip not found.','#dc2626'); return; }
+  const d=ls();const trip=d.trips.find(t=>t.id===tid);if(!trip){toast('Trip not found.','#dc2626');return;}
   const exps=d.expenses.filter(e=>e.tripId===tid);
   const totalSpent=exps.reduce((s,e)=>s+(+e.amount||0),0);
   const perHead=trip.travellers.length?Math.round(totalSpent/trip.travellers.length):0;
-
-  const {jsPDF}=window.jspdf;
-  const doc=new jsPDF();
-  const pg=doc.internal.pageSize;
+  const {jsPDF}=window.jspdf;const doc=new jsPDF();const pg=doc.internal.pageSize;
   let y=18;
-
-  // Header
-  doc.setFillColor(59,130,246);
-  doc.rect(0,0,pg.width,28,'F');
-  doc.setTextColor(255,255,255);
-  doc.setFontSize(18);doc.setFont('helvetica','bold');
+  doc.setFillColor(59,130,246);doc.rect(0,0,pg.width,28,'F');
+  doc.setTextColor(255,255,255);doc.setFontSize(17);doc.setFont('helvetica','bold');
   doc.text('TravelMate — Trip Report',14,17);
-
-  y=38;
-  doc.setTextColor(30,41,59);
-  doc.setFontSize(14);doc.setFont('helvetica','bold');
-  doc.text(trip.name,14,y); y+=8;
-
-  doc.setFontSize(9);doc.setFont('helvetica','normal');
-  doc.setTextColor(100,116,139);
-  if(trip.start) doc.text(`Dates: ${fmt(trip.start)} → ${fmt(trip.end)}`,14,y);
-  doc.text(`Days: ${trip.days} / Nights: ${trip.nights}`,110,y); y+=6;
+  y=38;doc.setTextColor(30,41,59);doc.setFontSize(13);doc.setFont('helvetica','bold');
+  doc.text(trip.name,14,y);y+=7;
+  doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(100,116,139);
+  if(trip.start)doc.text(`Dates: ${fmt(trip.start)} → ${fmt(trip.end)}`,14,y);
+  doc.text(`Days: ${trip.days} / Nights: ${trip.nights}`,110,y);y+=5;
   doc.text(`Travellers: ${trip.travellers.length}`,14,y);
-  if(trip.budget) doc.text(`Budget: ₹${Number(trip.budget).toLocaleString('en-IN')}`,110,y);
-  y+=10;
-
-  // Summary boxes
+  if(trip.budget)doc.text(`Budget: Rs ${Number(trip.budget).toLocaleString('en-IN')}`,110,y);y+=10;
   doc.setFillColor(239,246,255);
-  doc.roundedRect(14,y,55,16,3,3,'F');
-  doc.roundedRect(74,y,55,16,3,3,'F');
-  doc.roundedRect(134,y,55,16,3,3,'F');
-  doc.setTextColor(59,130,246);doc.setFontSize(10);doc.setFont('helvetica','bold');
-  doc.text('Total Spent',16,y+6);doc.text('Per Person',76,y+6);doc.text('Transactions',136,y+6);
-  doc.setTextColor(30,41,59);doc.setFontSize(11);
-  doc.text(`Rs ${totalSpent.toLocaleString('en-IN')}`,16,y+13);
-  doc.text(`Rs ${perHead.toLocaleString('en-IN')}`,76,y+13);
-  doc.text(`${exps.length}`,136,y+13);
-  y+=24;
-
-  // Travellers table
-  doc.setFontSize(11);doc.setFont('helvetica','bold');doc.setTextColor(30,41,59);
-  doc.text('Travellers & Balance',14,y);y+=4;
-  doc.autoTable({
-    startY:y,
+  doc.roundedRect(14,y,55,16,3,3,'F');doc.roundedRect(74,y,55,16,3,3,'F');doc.roundedRect(134,y,55,16,3,3,'F');
+  doc.setTextColor(59,130,246);doc.setFontSize(8);doc.setFont('helvetica','bold');
+  doc.text('Total Spent',16,y+5);doc.text('Per Person',76,y+5);doc.text('Transactions',136,y+5);
+  doc.setTextColor(30,41,59);doc.setFontSize(10);
+  doc.text(`Rs ${totalSpent.toLocaleString('en-IN')}`,16,y+12);
+  doc.text(`Rs ${perHead.toLocaleString('en-IN')}`,76,y+12);
+  doc.text(`${exps.length}`,136,y+12);y+=22;
+  doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(30,41,59);
+  doc.text('Travellers & Balance',14,y);y+=3;
+  doc.autoTable({startY:y,
     head:[['Name','Share (Rs)','Advance (Rs)','Balance']],
-    body:trip.travellers.map(m=>{
-      const adv=+m.advance||0;const bal=perHead-adv;
-      return [m.name,`Rs ${perHead.toLocaleString('en-IN')}`,`Rs ${adv.toLocaleString('en-IN')}`,
-        bal>0?`Owes Rs ${bal.toLocaleString('en-IN')}`:bal<0?`Overpaid Rs ${Math.abs(bal).toLocaleString('en-IN')}`:'Settled'];
+    body:trip.travellers.map(m=>{const adv=+m.advance||0,bal=perHead-adv;
+      return[m.name,`Rs ${perHead.toLocaleString('en-IN')}`,`Rs ${adv.toLocaleString('en-IN')}`,
+        bal>0?`Owes Rs ${bal.toLocaleString('en-IN')}`:(bal<0?`Overpaid Rs ${Math.abs(bal).toLocaleString('en-IN')}`:'Settled')];
     }),
-    styles:{fontSize:9,cellPadding:4},
+    styles:{fontSize:8,cellPadding:3,font:'helvetica'},
     headStyles:{fillColor:[59,130,246],textColor:255,fontStyle:'bold'},
-    alternateRowStyles:{fillColor:[239,246,255]},
-    margin:{left:14,right:14}
-  });
-  y=doc.lastAutoTable.finalY+10;
-
-  // Expenses table
-  doc.setFontSize(11);doc.setFont('helvetica','bold');doc.setTextColor(30,41,59);
-  doc.text('Expense Details',14,y);y+=4;
-  doc.autoTable({
-    startY:y,
+    alternateRowStyles:{fillColor:[239,246,255]},margin:{left:14,right:14}
+  });y=doc.lastAutoTable.finalY+8;
+  doc.setFontSize(10);doc.setFont('helvetica','bold');doc.text('Expense Details',14,y);y+=3;
+  doc.autoTable({startY:y,
     head:[['#','Category','Description','Date','Paid By','Amount (Rs)']],
     body:exps.map((e,i)=>[i+1,catLabel(e.cat),e.note||'—',e.date||'—',e.paidBy||'—',`Rs ${(+e.amount).toLocaleString('en-IN')}`]),
     foot:[['','','','','Total',`Rs ${totalSpent.toLocaleString('en-IN')}`]],
-    styles:{fontSize:9,cellPadding:3},
+    styles:{fontSize:8,cellPadding:3,font:'helvetica'},
     headStyles:{fillColor:[249,115,22],textColor:255,fontStyle:'bold'},
     footStyles:{fillColor:[255,247,237],textColor:[30,41,59],fontStyle:'bold'},
-    alternateRowStyles:{fillColor:[255,247,237]},
-    margin:{left:14,right:14}
+    alternateRowStyles:{fillColor:[255,247,237]},margin:{left:14,right:14}
   });
-
-  // Category breakdown
-  y=doc.lastAutoTable.finalY+10;
-  const catTotals={};
-  exps.forEach(e=>{ catTotals[e.cat]=(catTotals[e.cat]||0)+(+e.amount||0); });
+  const catTotals={};exps.forEach(e=>{catTotals[e.cat]=(catTotals[e.cat]||0)+(+e.amount||0);});
   if(Object.keys(catTotals).length){
-    doc.setFontSize(11);doc.setFont('helvetica','bold');doc.setTextColor(30,41,59);
-    doc.text('Category Breakdown',14,y);y+=4;
-    doc.autoTable({
-      startY:y,
+    y=doc.lastAutoTable.finalY+8;
+    doc.setFontSize(10);doc.setFont('helvetica','bold');doc.text('Category Breakdown',14,y);y+=3;
+    doc.autoTable({startY:y,
       head:[['Category','Amount (Rs)','% of Total']],
       body:Object.entries(catTotals).map(([c,v])=>[catLabel(c),`Rs ${v.toLocaleString('en-IN')}`,`${Math.round(v/totalSpent*100)}%`]),
-      styles:{fontSize:9,cellPadding:3},
+      styles:{fontSize:8,cellPadding:3,font:'helvetica'},
       headStyles:{fillColor:[236,72,153],textColor:255,fontStyle:'bold'},
-      alternateRowStyles:{fillColor:[253,242,248]},
-      margin:{left:14,right:14}
+      alternateRowStyles:{fillColor:[253,242,248]},margin:{left:14,right:14}
     });
   }
-
-  // Footer
   const totalPages=doc.getNumberOfPages();
   for(let i=1;i<=totalPages;i++){
-    doc.setPage(i);
-    doc.setFontSize(8);doc.setTextColor(148,163,184);
-    doc.text(`TravelMate — Generated on ${new Date().toLocaleString('en-IN')} · Page ${i} of ${totalPages}`,14,doc.internal.pageSize.height-8);
+    doc.setPage(i);doc.setFontSize(7);doc.setTextColor(148,163,184);
+    doc.text(`TravelMate · Generated ${new Date().toLocaleString('en-IN')} · Page ${i}/${totalPages}`,14,doc.internal.pageSize.height-7);
   }
-
   doc.save(`TravelMate_${trip.name.replace(/\s+/g,'_')}.pdf`);
   toast('PDF downloaded! 📄','#16a34a');
 }
 
 // ═══════════════════════════════════════════
-//  MODAL CLOSE ON OVERLAY CLICK
+//  MODAL CLOSE ON OVERLAY CLICK / SWIPE
 // ═══════════════════════════════════════════
 document.querySelectorAll('.overlay').forEach(el=>{
-  el.addEventListener('click',function(e){ if(e.target===this) this.classList.remove('open'); });
+  el.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
 });
 
 // ═══════════════════════════════════════════
-//  INIT — check if already logged in
+//  PWA INSTALL
 // ═══════════════════════════════════════════
-(function(){
-  const saved=sessionStorage.getItem('tmUser');
-  if(saved){ currentUser=JSON.parse(saved); }
-  // Check invite param already handled above
-})();
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();deferredPrompt=e;
+  setTimeout(()=>document.getElementById('install-banner').classList.add('show'),3000);
+});
+document.getElementById('install-btn').addEventListener('click',async()=>{
+  if(!deferredPrompt)return;
+  deferredPrompt.prompt();
+  const{outcome}=await deferredPrompt.userChoice;
+  deferredPrompt=null;
+  document.getElementById('install-banner').classList.remove('show');
+  if(outcome==='accepted')toast('TravelMate installed! 🎉','#16a34a');
+});
+window.addEventListener('appinstalled',()=>{
+  document.getElementById('install-banner').classList.remove('show');
+  toast('TravelMate installed! 🎉','#16a34a');
+});
+
+// ═══════════════════════════════════════════
+//  SERVICE WORKER REGISTER
+// ═══════════════════════════════════════════
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js')
+      .then(()=>console.log('SW registered'))
+      .catch(e=>console.log('SW error:',e));
+  });
+}
 </script>
 </body>
 </html>
