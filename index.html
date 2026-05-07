@@ -90,7 +90,14 @@ body{
 /* ═══════════════════════════════════════
    SCREENS
 ═══════════════════════════════════════ */
-.screen{display:none;position:relative;z-index:10;min-height:100vh;}
+.screen{
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:10;
+  overflow-y:auto;
+  background:var(--bg);
+}
 .screen.active{display:block;}
 
 /* ═══════════════════════════════════════
@@ -291,9 +298,13 @@ table.dtbl tr:hover td{background:var(--blue-light);}
    LOGIN SCREEN
 ═══════════════════════════════════════ */
 #screen-login{
-  display:flex;align-items:center;justify-content:center;
-  min-height:100vh;padding:20px;
   background:linear-gradient(160deg,#dbeafe 0%,#fef3c7 50%,#fce7f3 100%);
+}
+#screen-login.active{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
 }
 .login-box{
   background:rgba(255,255,255,0.95);backdrop-filter:blur(16px);
@@ -316,13 +327,12 @@ table.dtbl tr:hover td{background:var(--blue-light);}
    SIGNUP SCREEN
 ═══════════════════════════════════════ */
 #screen-signup{
-  position:fixed;inset:0;z-index:500;
-  overflow-y:auto;
-  display:none;
   background:linear-gradient(160deg,#fce7f3 0%,#dbeafe 60%,#ecfdf5 100%);
 }
 #screen-signup.active{
-  display:block;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
 }
 .signup-scroll-wrap{
   min-height:100%;
@@ -396,7 +406,7 @@ table.dtbl tr:hover td{background:var(--blue-light);}
 ═══════════════════════════════════════ */
 .pending-screen{
   display:flex;align-items:center;justify-content:center;
-  min-height:100vh;padding:20px;
+  min-height:100%;padding:20px;
   background:linear-gradient(160deg,#fffbeb 0%,#fef3c7 100%);
 }
 .pending-box{
@@ -634,7 +644,6 @@ table.dtbl tr:hover td{background:var(--blue-light);}
 
 <!-- ════ SCREEN: LOGIN ════ -->
 <div class="screen active" id="screen-login">
-  <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:linear-gradient(160deg,#dbeafe 0%,#fef3c7 50%,#fce7f3 100%);">
     <div class="login-box">
       <div class="login-logo">
         <img src="https://raw.githubusercontent.com/travelmate8310/TravelMate/main/logo.png" alt="TravelMate" onerror="this.style.display='none'">
@@ -658,7 +667,6 @@ table.dtbl tr:hover td{background:var(--blue-light);}
         Don't have an account? <a onclick="showScreen('screen-signup')">Sign Up</a>
       </div>
     </div>
-  </div>
 </div>
 
 <!-- ════ SCREEN: SIGNUP ════ -->
@@ -1051,16 +1059,9 @@ function catBg(c){ return {hotel:'#ede9fe',fuel:'#dcfce7',food:'#fff7ed',transpo
 //  SCREEN ROUTING
 // ═══════════════════════════════════════════
 function showScreen(id){
-  document.querySelectorAll('.screen').forEach(s=>{
-    s.classList.remove('active');
-    // Reset signup screen visibility when hiding it
-    if(s.id==='screen-signup') s.style.display='none';
-  });
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   const sc=document.getElementById(id);
-  if(sc){
-    sc.classList.add('active');
-    sc.style.display=''; // restore display
-  }
+  if(sc){ sc.classList.add('active'); }
   window.scrollTo(0,0);
 }
 
@@ -1168,8 +1169,9 @@ async function su_sendOtp(){
       to_email : email,
       to_name  : fname,
       otp_code : generatedOtp,
-      app_name : 'TravelMate'
-    });
+      app_name : 'TravelMate',
+      reply_to : 'noreply@travelmate.app'
+    }, EMAILJS_PUBLIC_KEY);
     document.getElementById('signup-step1').style.display='none';
     document.getElementById('signup-step2').style.display='block';
     document.getElementById('otp-send-status').textContent='✓ OTP sent to '+email;
