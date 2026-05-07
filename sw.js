@@ -1,13 +1,12 @@
-// TravelMate Service Worker v1.0
-const CACHE_NAME = 'travelmate-v1';
+// TravelMate Service Worker v1.1
+const CACHE_NAME = 'travelmate-v2';
 const ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/logo.png',
-  'https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800;900&family=Pacifico&display=swap',
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js'
+  '/logo.png'
+  // Note: external CDN URLs (fonts, Firebase, jsPDF) are intentionally excluded
+  // — they use CORS headers that prevent caching and cause SW install failures
 ];
 
 // Install — cache all assets
