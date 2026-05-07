@@ -1,29 +1,37 @@
-// TravelMate Service Worker v1.2
-const CACHE_NAME = 'travelmate-v4';
+// TravelMate Service Worker v1.5
+const CACHE_NAME = 'travelmate-v5';
+
+// Derive base path from SW location
+// On GitHub Pages: /TravelMate/sw.js → base = /TravelMate/
+// On custom domain: /sw.js → base = /
+const SW_PATH = self.location.pathname; // e.g. /TravelMate/sw.js
+const BASE = SW_PATH.substring(0, SW_PATH.lastIndexOf('/') + 1); // e.g. /TravelMate/
+
 const ASSETS = [
-  '/index.html',
-  '/manifest.json'
-  // logo.png cached on-demand if it exists
-  // External CDN URLs excluded — they block with CORS
+  BASE + 'index.html',
+  BASE + 'manifest.json',
+  BASE + 'logo.png'
 ];
 
-// Install — cache each asset individually, skip any that fail
+// Install — cache files using correct paths, skip silently if missing
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return Promise.allSettled(
+    caches.open(CACHE_NAME).then(cache =>
+      Promise.allSettled(
         ASSETS.map(url =>
-          cache.add(url).catch(err => {
-            console.log('Skipped caching (not found):', url, err.message);
+          fetch(url).then(res => {
+            if (res.ok) return cache.put(url, res);
+          }).catch(() => {
+            // Silently skip — file may not exist (e.g. logo.png optional)
           })
         )
-      );
-    })
+      )
+    )
   );
   self.skipWaiting();
 });
 
-// Activate — clean old caches
+// Activate — remove old caches
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -33,15 +41,18 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// Fetch — network first for external, cache first for local
+// Fetch strategy:
+// - External (Firebase, CDN, fonts): always network, no caching
+// - Local files: cache-first, fallback to network
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   if (!e.request.url.startsWith('http')) return;
 
   const url = new URL(e.request.url);
   const isExternal = url.hostname !== self.location.hostname;
+
   if (isExternal) {
-    e.respondWith(fetch(e.request).catch(() => new Response('', {status: 503})));
+    // Let external requests go straight to network — never cache Firebase/EmailJS
     return;
   }
 
@@ -51,12 +62,13 @@ self.addEventListener('fetch', e => {
       return fetch(e.request).then(response => {
         if (response && response.status === 200) {
           const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
+          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
         }
         return response;
       }).catch(() => {
+        // Offline fallback: serve index.html for navigation requests
         if (e.request.mode === 'navigate') {
-          return caches.match('/index.html');
+          return caches.match(BASE + 'index.html');
         }
       });
     })
