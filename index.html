@@ -1166,11 +1166,12 @@ async function su_sendOtp(){
 
     emailjs.init(EMAILJS_PUBLIC_KEY);
     await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-      to_email : email,
-      to_name  : fname,
-      otp_code : generatedOtp,
-      app_name : 'TravelMate',
-      reply_to : 'noreply@travelmate.app'
+      to_email  : email,      // must match "To Email" field in EmailJS template
+      to_name   : fname,
+      otp_code  : generatedOtp,
+      app_name  : 'TravelMate',
+      from_name : 'TravelMate',
+      reply_to  : email
     }, EMAILJS_PUBLIC_KEY);
     document.getElementById('signup-step1').style.display='none';
     document.getElementById('signup-step2').style.display='block';
