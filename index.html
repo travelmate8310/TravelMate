@@ -316,9 +316,13 @@ table.dtbl tr:hover td{background:var(--blue-light);}
 #screen-signup{
   position:fixed;inset:0;z-index:500;
   overflow-y:auto;
+  display:none;
   padding:24px 16px 100px;
   background:linear-gradient(160deg,#fce7f3 0%,#dbeafe 60%,#ecfdf5 100%);
-  display:flex;align-items:flex-start;justify-content:center;
+  align-items:flex-start;justify-content:center;
+}
+#screen-signup.active{
+  display:flex;
 }
 .signup-box{
   background:rgba(255,255,255,0.96);backdrop-filter:blur(16px);
@@ -652,7 +656,7 @@ table.dtbl tr:hover td{background:var(--blue-light);}
 
 <!-- ════ SCREEN: SIGNUP ════ -->
 <div class="screen" id="screen-signup">
-  <div style="min-height:100vh;background:linear-gradient(160deg,#fce7f3 0%,#dbeafe 60%,#ecfdf5 100%);display:flex;align-items:flex-start;justify-content:center;padding:24px 14px 100px;">
+  <div style="width:100%;display:flex;align-items:flex-start;justify-content:center;padding:24px 14px 100px;">
     <div class="signup-box">
       <div style="text-align:center;margin-bottom:20px;">
         <img src="logo.png" alt="TravelMate" style="width:52px;height:52px;border-radius:12px;object-fit:cover;margin-bottom:8px;" onerror="this.style.display='none'">
@@ -1037,9 +1041,16 @@ function catBg(c){ return {hotel:'#ede9fe',fuel:'#dcfce7',food:'#fff7ed',transpo
 //  SCREEN ROUTING
 // ═══════════════════════════════════════════
 function showScreen(id){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.screen').forEach(s=>{
+    s.classList.remove('active');
+    // Reset signup screen visibility when hiding it
+    if(s.id==='screen-signup') s.style.display='none';
+  });
   const sc=document.getElementById(id);
-  if(sc) sc.classList.add('active');
+  if(sc){
+    sc.classList.add('active');
+    sc.style.display=''; // restore display
+  }
   window.scrollTo(0,0);
 }
 
