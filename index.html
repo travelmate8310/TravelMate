@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#3b82f6"/>
 <meta name="description" content="TravelMate — Plan trips, split expenses, travel happy"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
 <meta name="apple-mobile-web-app-title" content="TravelMate"/>
 <link rel="manifest" href="manifest.json"/>
@@ -14,6 +15,22 @@
 <title>TravelMate ✈️</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800;900&family=Pacifico&display=swap" rel="stylesheet">
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyBORiDaukVvh0o7HZcntR2E-590Ik09p-0",
+    authDomain: "travelmate8310-8e365.firebaseapp.com",
+    projectId: "travelmate8310-8e365",
+    storageBucket: "travelmate8310-8e365.firebasestorage.app",
+    messagingSenderId: "1033542401957",
+    appId: "1:1033542401957:web:8f0ef155d482a189c0724c",
+    measurementId: "G-YQESPQLEYE"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <style>
@@ -297,7 +314,9 @@ table.dtbl tr:hover td{background:var(--blue-light);}
    SIGNUP SCREEN
 ═══════════════════════════════════════ */
 #screen-signup{
-  min-height:100vh;padding:24px 16px 100px;
+  position:fixed;inset:0;z-index:500;
+  overflow-y:auto;
+  padding:24px 16px 100px;
   background:linear-gradient(160deg,#fce7f3 0%,#dbeafe 60%,#ecfdf5 100%);
   display:flex;align-items:flex-start;justify-content:center;
 }
@@ -938,10 +957,28 @@ table.dtbl tr:hover td{background:var(--blue-light);}
 
 <script>
 // ═══════════════════════════════════════════
-//  STORAGE
+//  FIREBASE DATA LAYER  (replaces localStorage ls/sv)
 // ═══════════════════════════════════════════
-function ls(){ return JSON.parse(localStorage.getItem('travelmate')||'{"users":[],"trips":[],"expenses":[],"notes":[]}'); }
-function sv(d){ localStorage.setItem('travelmate',JSON.stringify(d)); }
+// All reads/writes go to Firestore collections: users, trips, expenses, notes
+// Keeps the same data shape so all existing render functions work unchanged.
+
+async function getAllData(){
+  const [usersSnap,tripsSnap,expSnap,notesSnap] = await Promise.all([
+    db.collection('users').get(),
+    db.collection('trips').get(),
+    db.collection('expenses').get(),
+    db.collection('notes').get()
+  ]);
+  return {
+    users:  usersSnap.docs.map(d=>({id:d.id,...d.data()})),
+    trips:  tripsSnap.docs.map(d=>({id:d.id,...d.data()})),
+    expenses: expSnap.docs.map(d=>({id:d.id,...d.data()})),
+    notes:  notesSnap.docs.map(d=>({id:d.id,...d.data()}))
+  };
+}
+// Convenience: save/update a single doc
+async function setDoc(col,docId,data){ await db.collection(col).doc(docId).set(data,{merge:true}); }
+async function delDoc(col,docId){ await db.collection(col).doc(docId).delete(); }
 
 // ═══════════════════════════════════════════
 //  STATE
@@ -1009,22 +1046,35 @@ function showScreen(id){
 // ═══════════════════════════════════════════
 //  LOGIN
 // ═══════════════════════════════════════════
-function doLogin(){
+async function doLogin(){
   const user=document.getElementById('login-user').value.trim();
   const pw=document.getElementById('login-pw').value;
   const errEl=document.getElementById('login-err');
+  const btn=document.querySelector('#screen-login .btn-blue');
   errEl.style.display='none';
   if(!user||!pw){errEl.textContent='Enter username and password.';errEl.style.display='block';return;}
-  const data=ls();
-  const found=data.users.find(u=>u.username===user);
-  if(!found){errEl.textContent='Username not found.';errEl.style.display='block';return;}
-  if(found.passwordHash!==btoa(pw)){errEl.textContent='Incorrect password.';errEl.style.display='block';return;}
-  if(found.status==='pending'){document.getElementById('pending-email').textContent=found.email;showScreen('screen-pending');return;}
-  if(found.status==='rejected'){errEl.textContent='Account not approved. Contact admin.';errEl.style.display='block';return;}
-  currentUser=found;
-  if(found.role==='admin') loadAdminDash();
-  else if(found.role==='organiser') loadOrgDash();
-  else loadTrvDash();
+  btn.textContent='Signing in…';btn.disabled=true;
+  try{
+    const snap=await db.collection('users').where('username','==',user).limit(1).get();
+    if(snap.empty){
+      errEl.innerHTML='Username not found. Check spelling (e.g. <strong>ganesh031099</strong>).';
+      errEl.style.display='block';return;
+    }
+    const found={id:snap.docs[0].id,...snap.docs[0].data()};
+    if(found.passwordHash!==btoa(pw)){errEl.textContent='Incorrect password.';errEl.style.display='block';return;}
+    if(found.status==='pending'){document.getElementById('pending-email').textContent=found.email;showScreen('screen-pending');return;}
+    if(found.status==='rejected'){errEl.textContent='Account not approved. Contact admin.';errEl.style.display='block';return;}
+    if(found.status==='suspended'){errEl.textContent='Account suspended. Contact admin.';errEl.style.display='block';return;}
+    currentUser=found;
+    if(found.role==='admin') loadAdminDash();
+    else if(found.role==='organiser') loadOrgDash();
+    else loadTrvDash();
+  }catch(e){
+    errEl.textContent='Connection error. Check internet and try again.';errEl.style.display='block';
+    console.error(e);
+  }finally{
+    btn.textContent='Sign In →';btn.disabled=false;
+  }
 }
 function doLogout(){
   currentUser=null;activeTripId=null;
@@ -1056,7 +1106,7 @@ function su_checkPw(){
   if(cpw){m.style.color=pw===cpw?'var(--green)':'var(--red)';m.textContent=pw===cpw?'✓ Passwords match':'✗ No match';}
   else m.textContent='';
 }
-function su_sendOtp(){
+async function su_sendOtp(){
   const fname=document.getElementById('s-fname').value.trim();
   const dob=document.getElementById('s-dob').value;
   const mobile=document.getElementById('s-mobile').value.trim();
@@ -1071,9 +1121,13 @@ function su_sendOtp(){
   if(!/^\d{10}$/.test(mobile)){toast('Enter valid 10-digit mobile.','#dc2626');return;}
   const username=genUsername(fname,dob);
   if(!username){toast('Check name and DOB.','#dc2626');return;}
-  const data=ls();
-  if(data.users.find(u=>u.email===email)){toast('Email already registered.','#dc2626');return;}
-  if(data.users.find(u=>u.username===username)){toast('Username taken. Already registered?','#dc2626');return;}
+  // Check duplicates in Firestore
+  const [emailSnap,userSnap]=await Promise.all([
+    db.collection('users').where('email','==',email).limit(1).get(),
+    db.collection('users').where('username','==',username).limit(1).get()
+  ]);
+  if(!emailSnap.empty){toast('Email already registered.','#dc2626');return;}
+  if(!userSnap.empty){toast('Username taken. Already registered?','#dc2626');return;}
   generatedOtp=String(Math.floor(100000+Math.random()*900000));
   document.getElementById('otp-hint').textContent=generatedOtp;
   pendingSignupData={fname,lname:document.getElementById('s-lname').value.trim(),dob,mobile,email,gender,role,pw,username,inviteOrgId};
@@ -1088,25 +1142,32 @@ function otpNext(el,idx){
     if(idx<5) inputs[idx+1].focus();
   }
 }
-function su_verifyOtp(){
+async function su_verifyOtp(){
   const digits=[...document.querySelectorAll('.otp-digit')].map(i=>i.value).join('');
   if(digits.length!==6){toast('Enter complete 6-digit OTP.','#dc2626');return;}
   if(digits!==generatedOtp){toast('Incorrect OTP.','#dc2626');return;}
-  const d=ls();
+  // Get user count for ID generation
+  const usersSnap=await db.collection('users').get();
+  const allUsers=usersSnap.docs.map(d=>d.data());
   const isInvite=!!pendingSignupData.inviteOrgId;
+  const docId=uid();
   const user={
-    id:uid(),userId:genUserId(pendingSignupData.role,d.users),
+    id:docId,
+    userId:genUserId(pendingSignupData.role,allUsers),
     username:pendingSignupData.username,
-    firstName:pendingSignupData.fname,lastName:pendingSignupData.lname,
-    email:pendingSignupData.email,mobile:pendingSignupData.mobile,
-    dob:pendingSignupData.dob,gender:pendingSignupData.gender,
+    firstName:pendingSignupData.fname,
+    lastName:pendingSignupData.lname,
+    email:pendingSignupData.email,
+    mobile:pendingSignupData.mobile,
+    dob:pendingSignupData.dob,
+    gender:pendingSignupData.gender,
     role:pendingSignupData.role,
     passwordHash:btoa(pendingSignupData.pw),
     status:isInvite?'active':'pending',
     invitedBy:pendingSignupData.inviteOrgId||null,
     createdAt:new Date().toISOString()
   };
-  d.users.push(user);sv(d);
+  await db.collection('users').doc(docId).set(user);
   generatedOtp=null;pendingSignupData=null;
   [...document.querySelectorAll('.otp-digit')].forEach(i=>i.value='');
   document.getElementById('signup-step1').style.display='block';
@@ -1118,15 +1179,15 @@ function su_verifyOtp(){
 // ═══════════════════════════════════════════
 //  ADMIN DASHBOARD
 // ═══════════════════════════════════════════
-function loadAdminDash(){
+async function loadAdminDash(){
   document.getElementById('admin-av').textContent=initials(currentUser.firstName);
   document.getElementById('admin-uname').textContent=currentUser.username;
   showScreen('screen-admin');
-  renderAdminStats();
+  await renderAdminStats();
   adminTab('pending');
 }
-function renderAdminStats(){
-  const d=ls();
+async function renderAdminStats(){
+  const d=await getAllData();
   const pending=d.users.filter(u=>u.status==='pending').length;
   document.getElementById('admin-stats').innerHTML=`
     <div class="stat-box"><div class="sv" style="color:var(--yellow)">${pending}</div><div class="sl">Pending</div></div>
@@ -1136,61 +1197,40 @@ function renderAdminStats(){
     <div class="stat-box"><div class="sv" style="color:var(--green)">${d.trips.length}</div><div class="sl">Trips</div></div>
   `;
 }
-function adminTab(tab){
+async function adminTab(tab){
   ['pending','users','trips'].forEach(t=>{
     document.getElementById('admin-tab-'+t).style.display=t===tab?'block':'none';
     const btn=document.getElementById('atab-'+t);
     if(btn){btn.className=t===tab?'btn btn-blue btn-sm':'btn btn-ghost btn-sm';}
   });
-  // bottom nav active
   document.querySelectorAll('#admin-bottom-nav .bn-item').forEach((el,i)=>{
     el.classList.toggle('active',['pending','users','trips'][i]===tab);
   });
-  const d=ls();
+  const d=await getAllData();
   if(tab==='pending') renderAdminPending(d);
   else if(tab==='users') renderAdminUsers(d);
   else if(tab==='trips') renderAdminTrips(d);
 }
-
 function renderAdminPending(d){
   const pend=d.users.filter(u=>u.status==='pending');
   const el=document.getElementById('admin-pending-content');
   if(!pend.length){el.innerHTML=`<div class="empty-state"><span class="ei">🎉</span><p>No pending requests!</p></div>`;return;}
-  // Mobile: cards; Desktop: table
-  el.innerHTML=`
-    <div class="tbl-wrap" style="display:none;" class="desktop-only" id="pend-tbl-wrap">
-      <table class="dtbl">
-        <thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Action</th></tr></thead>
-        <tbody>${pend.map(u=>`<tr>
-          <td>${u.firstName} ${u.lastName||''}</td>
-          <td><strong>${u.username}</strong></td>
-          <td>${u.email}</td>
-          <td><span class="badge badge-blue">${u.role}</span></td>
-          <td style="display:flex;gap:6px;">
-            <button class="btn btn-green btn-xs" onclick="approveUser('${u.id}')">✓ Approve</button>
-            <button class="btn btn-red btn-xs" onclick="rejectUser('${u.id}')">✗ Reject</button>
-          </td>
-        </tr>`).join('')}</tbody>
-      </table>
-    </div>
-    ${pend.map(u=>`
-      <div class="user-card-mobile">
-        <div class="ucm-top">
-          <div class="mem-av">${initials(u.firstName)}</div>
-          <div class="ucm-info">
-            <div class="ucm-name">${u.firstName} ${u.lastName||''}</div>
-            <div class="ucm-uname">${u.username} · ${u.email}</div>
-          </div>
-          <span class="badge badge-blue">${u.role}</span>
+  el.innerHTML=pend.map(u=>`
+    <div class="user-card-mobile">
+      <div class="ucm-top">
+        <div class="mem-av">${initials(u.firstName)}</div>
+        <div class="ucm-info">
+          <div class="ucm-name">${u.firstName} ${u.lastName||''}</div>
+          <div class="ucm-uname">${u.username} · ${u.email}</div>
         </div>
-        <div class="ucm-actions">
-          <button class="btn btn-green btn-sm" onclick="approveUser('${u.id}')">✓ Approve</button>
-          <button class="btn btn-red btn-sm" onclick="rejectUser('${u.id}')">✗ Reject</button>
-        </div>
-      </div>`).join('')}
-  `;
+        <span class="badge badge-blue">${u.role}</span>
+      </div>
+      <div class="ucm-actions">
+        <button class="btn btn-green btn-sm" onclick="approveUser('${u.id}')">✓ Approve</button>
+        <button class="btn btn-red btn-sm" onclick="rejectUser('${u.id}')">✗ Reject</button>
+      </div>
+    </div>`).join('');
 }
-
 function renderAdminUsers(d){
   const users=d.users.filter(u=>u.role!=='admin');
   const el=document.getElementById('admin-users-content');
@@ -1218,7 +1258,6 @@ function renderAdminUsers(d){
       </div>
     </div>`).join('');
 }
-
 function renderAdminTrips(d){
   const el=document.getElementById('admin-trips-content');
   if(!d.trips.length){el.innerHTML=`<div class="empty-state"><span class="ei">🗺️</span><p>No trips yet.</p></div>`;return;}
@@ -1231,7 +1270,7 @@ function renderAdminTrips(d){
         <div>
           <div style="font-family:var(--font-display);font-size:1rem;color:var(--blue2);">${t.name}</div>
           <div style="font-size:0.78rem;color:var(--muted);font-weight:600;margin-top:3px;">
-            📅 ${fmt(t.start)} → ${fmt(t.end)} · 👥 ${t.travellers.length} pax · By: ${org?org.firstName:'—'}
+            📅 ${fmt(t.start)} → ${fmt(t.end)} · 👥 ${(t.travellers||[]).length} pax · By: ${org?org.firstName:'—'}
           </div>
         </div>
         <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;">
@@ -1243,53 +1282,54 @@ function renderAdminTrips(d){
     </div>`;
   }).join('');
 }
-
-function approveUser(id){
-  const d=ls();const u=d.users.find(x=>x.id===id);if(!u)return;
-  u.status='active';sv(d);
+async function approveUser(id){
+  await db.collection('users').doc(id).update({status:'active'});
+  const snap=await db.collection('users').doc(id).get();
+  const u=snap.data();
   toast(`✓ ${u.firstName} approved! Username: ${u.username}`,'#16a34a');
-  renderAdminStats();adminTab('pending');
+  await renderAdminStats();adminTab('pending');
 }
-function rejectUser(id){
+async function rejectUser(id){
   if(!confirm('Reject this user?'))return;
-  const d=ls();const u=d.users.find(x=>x.id===id);if(!u)return;
-  u.status='rejected';sv(d);
-  toast('User rejected.','#dc2626');renderAdminStats();adminTab('pending');
+  await db.collection('users').doc(id).update({status:'rejected'});
+  toast('User rejected.','#dc2626');await renderAdminStats();adminTab('pending');
 }
-function suspendUser(id){
-  if(!confirm('Suspend this user? They won\'t be able to login.'))return;
-  const d=ls();const u=d.users.find(x=>x.id===id);if(!u)return;
-  u.status='suspended';sv(d);
-  toast(`${u.firstName} suspended.`,'#d97706');renderAdminStats();adminTab('users');
+async function suspendUser(id){
+  if(!confirm('Suspend this user?'))return;
+  await db.collection('users').doc(id).update({status:'suspended'});
+  toast('User suspended.','#d97706');await renderAdminStats();adminTab('users');
 }
-function deleteUser(id,name){
-  if(!confirm(`Permanently delete user "${name}"? This cannot be undone.`))return;
-  const d=ls();
-  d.users=d.users.filter(u=>u.id!==id);
-  sv(d);
-  toast(`${name} deleted.`,'#dc2626');renderAdminStats();adminTab('users');
+async function deleteUser(id,name){
+  if(!confirm(`Permanently delete user "${name}"?`))return;
+  await db.collection('users').doc(id).delete();
+  toast(`${name} deleted.`,'#dc2626');await renderAdminStats();adminTab('users');
 }
-function adminDeleteTrip(tid){
+async function adminDeleteTrip(tid){
   if(!confirm('Delete this trip and all its expenses?'))return;
-  const d=ls();
-  d.trips=d.trips.filter(t=>t.id!==tid);
-  d.expenses=d.expenses.filter(e=>e.tripId!==tid);
-  d.notes=(d.notes||[]).filter(n=>n.tripId!==tid);
-  sv(d);toast('Trip deleted.','#dc2626');renderAdminStats();adminTab('trips');
+  const [expSnap,notesSnap]=await Promise.all([
+    db.collection('expenses').where('tripId','==',tid).get(),
+    db.collection('notes').where('tripId','==',tid).get()
+  ]);
+  const batch=db.batch();
+  batch.delete(db.collection('trips').doc(tid));
+  expSnap.docs.forEach(d=>batch.delete(d.ref));
+  notesSnap.docs.forEach(d=>batch.delete(d.ref));
+  await batch.commit();
+  toast('Trip deleted.','#dc2626');await renderAdminStats();adminTab('trips');
 }
 
 // ═══════════════════════════════════════════
 //  ORGANISER
 // ═══════════════════════════════════════════
-function loadOrgDash(){
+async function loadOrgDash(){
   document.getElementById('org-av').textContent=initials(currentUser.firstName);
   document.getElementById('org-uname').textContent=currentUser.username;
   showScreen('screen-organiser');renderOrgTrips();
 }
-function renderOrgTrips(){
+async function renderOrgTrips(){
   document.getElementById('org-trips-view').style.display='block';
   document.getElementById('org-detail-view').style.display='none';
-  const d=ls();
+  const d=await getAllData();
   const myTrips=d.trips.filter(t=>t.organiserId===currentUser.id);
   const grid=document.getElementById('org-trips-grid');
   if(!myTrips.length){grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1"><span class="ei">✈️</span><p>No trips yet.<br>Tap <strong>+ New Trip</strong>!</p></div>`;return;}
@@ -1301,7 +1341,7 @@ function renderOrgTrips(){
       <div class="tc-dates">📅 ${fmt(t.start)} → ${fmt(t.end)}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
         <span class="badge badge-blue">☀️ ${t.days}D / 🌙 ${t.nights}N</span>
-        <span class="badge badge-orange">👥 ${t.travellers.length} pax</span>
+        <span class="badge badge-orange">👥 ${(t.travellers||[]).length} pax</span>
       </div>
       <div class="tc-bottom">
         <span style="font-weight:900;color:var(--orange);font-size:0.95rem;">₹${spent.toLocaleString('en-IN')}</span>
@@ -1310,19 +1350,20 @@ function renderOrgTrips(){
     </div>`;
   }).join('');
 }
-function openOrgTripDetail(tid){
+async function openOrgTripDetail(tid){
   activeTripId=tid;
   document.getElementById('org-trips-view').style.display='none';
   document.getElementById('org-detail-view').style.display='block';
   renderOrgDetail();
 }
-function renderOrgDetail(){
-  const d=ls();
+async function renderOrgDetail(){
+  const d=await getAllData();
   const trip=d.trips.find(t=>t.id===activeTripId);if(!trip)return;
   const exps=d.expenses.filter(e=>e.tripId===activeTripId);
-  const notes=(d.notes||[]).filter(n=>n.tripId===activeTripId);
+  const notes=d.notes.filter(n=>n.tripId===activeTripId);
   const totalSpent=exps.reduce((s,e)=>s+(+e.amount||0),0);
-  const perHead=trip.travellers.length?Math.round(totalSpent/trip.travellers.length):0;
+  const travellers=trip.travellers||[];
+  const perHead=travellers.length?Math.round(totalSpent/travellers.length):0;
   const el=document.getElementById('org-detail-view');
   el.innerHTML=`
     <div class="back-btn" onclick="renderOrgTrips()">← Back to Trips</div>
@@ -1331,7 +1372,7 @@ function renderOrgDetail(){
       <div style="display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:0.82rem;font-weight:600;margin-bottom:14px;">
         ${trip.start?`<span>📅 ${fmt(trip.start)} → ${fmt(trip.end)}</span>`:''}
         <span>☀️ ${trip.days}D / 🌙 ${trip.nights}N</span>
-        <span>👥 ${trip.travellers.length} Travellers</span>
+        <span>👥 ${travellers.length} Travellers</span>
         ${trip.budget?`<span>💰 ₹${Number(trip.budget).toLocaleString('en-IN')}</span>`:''}
       </div>
       <div style="margin-bottom:4px;font-size:0.72rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.7px;">🔗 Invite Link</div>
@@ -1376,25 +1417,30 @@ function renderOrgDetail(){
 }
 function renderMemberTable(trip,perHead,d){
   const tbody=document.getElementById('mem-tbody');if(!tbody)return;
-  tbody.innerHTML=trip.travellers.map((m,i)=>{
+  const travellers=trip.travellers||[];
+  tbody.innerHTML=travellers.map((m,i)=>{
     const adv=+m.advance||0,bal=perHead-adv;
     const balStyle=bal>0?'color:var(--red);':'color:var(--green);';
     const balStr=bal>0?`Owes ₹${bal.toLocaleString('en-IN')}`:(bal<0?`Overpaid ₹${Math.abs(bal).toLocaleString('en-IN')}`:'✓ Settled');
     return `<tr>
-      <td><div style="display:flex;align-items:center;"><div class="mem-av">${initials(m.name)}</div>${m.name}</div></td>
+      <td><div style="display:flex;align-items:center;gap:6px;"><div class="mem-av">${initials(m.name)}</div>${m.name}</div></td>
       <td>₹${perHead.toLocaleString('en-IN')}</td>
       <td><input class="adv-input" type="number" value="${adv}" min="0" inputmode="decimal" onchange="updateAdvance(${i},this.value)" oninput="updateAdvance(${i},this.value)"></td>
       <td style="${balStyle}font-weight:800;font-size:0.82rem;">${balStr}</td>
     </tr>`;
   }).join('');
 }
-function updateAdvance(idx,val){
-  const d=ls();const trip=d.trips.find(t=>t.id===activeTripId);
-  if(!trip||!trip.travellers[idx])return;
-  trip.travellers[idx].advance=+val||0;sv(d);
-  const exps=d.expenses.filter(e=>e.tripId===activeTripId);
+async function updateAdvance(idx,val){
+  const snap=await db.collection('trips').doc(activeTripId).get();
+  const trip={id:snap.id,...snap.data()};
+  if(!trip||!(trip.travellers||[])[idx])return;
+  trip.travellers[idx].advance=+val||0;
+  await db.collection('trips').doc(activeTripId).update({travellers:trip.travellers});
+  const expSnap=await db.collection('expenses').where('tripId','==',activeTripId).get();
+  const exps=expSnap.docs.map(d=>d.data());
   const totalSpent=exps.reduce((s,e)=>s+(+e.amount||0),0);
-  const perHead=trip.travellers.length?Math.round(totalSpent/trip.travellers.length):0;
+  const perHead=(trip.travellers||[]).length?Math.round(totalSpent/(trip.travellers||[]).length):0;
+  const d=await getAllData();
   renderMemberTable(trip,perHead,d);
 }
 function renderExpList(exps,cid,canDelete){
@@ -1415,20 +1461,25 @@ function renderExpList(exps,cid,canDelete){
 }
 function renderNotesList(notes,cid){
   const el=document.getElementById(cid);if(!el)return;
-  if(!notes.length){el.innerHTML=`<div style="color:var(--muted);font-size:0.85rem;font-weight:600;">No notes from travellers yet.</div>`;return;}
+  if(!notes.length){el.innerHTML=`<div style="color:var(--muted);font-size:0.85rem;font-weight:600;">No notes yet.</div>`;return;}
   el.innerHTML=notes.map(n=>`
     <div class="note-item">
       <div class="note-by">✏️ ${n.by} · ${fmt(n.date)}</div>
       <div class="note-text">${n.text}</div>
     </div>`).join('');
 }
-function orgDeleteTrip(tid){
+async function orgDeleteTrip(tid){
   if(!confirm('Delete this trip?'))return;
-  const d=ls();
-  d.trips=d.trips.filter(t=>t.id!==tid);
-  d.expenses=d.expenses.filter(e=>e.tripId!==tid);
-  d.notes=(d.notes||[]).filter(n=>n.tripId!==tid);
-  sv(d);toast('Trip deleted.','#dc2626');renderOrgTrips();
+  const [expSnap,notesSnap]=await Promise.all([
+    db.collection('expenses').where('tripId','==',tid).get(),
+    db.collection('notes').where('tripId','==',tid).get()
+  ]);
+  const batch=db.batch();
+  batch.delete(db.collection('trips').doc(tid));
+  expSnap.docs.forEach(d=>batch.delete(d.ref));
+  notesSnap.docs.forEach(d=>batch.delete(d.ref));
+  await batch.commit();
+  toast('Trip deleted.','#dc2626');renderOrgTrips();
 }
 function copyInviteLink(){
   const link=document.getElementById('inv-link-text').textContent;
@@ -1443,15 +1494,15 @@ function nt_calcDays(){
   if(s&&e){const diff=Math.round((new Date(e)-new Date(s))/86400000);
     if(diff>=0){document.getElementById('nt-days').value=diff+1;document.getElementById('nt-nights').value=diff;}}
 }
-function openModal(id){
+async function openModal(id){
   if(id==='modal-new-trip'){
-    const d=ls();
+    const d=await getAllData();
     const travs=d.users.filter(u=>u.role==='traveller'&&u.status==='active');
     const c=document.getElementById('nt-travellers-available');
     selectedTravellers=[];
-    if(!travs.length){c.innerHTML=`<span style="font-size:0.8rem;color:var(--muted);font-weight:600;">No approved travellers yet. Share invite link!</span>`;
-    }else{c.innerHTML=travs.map(t=>`
-      <div id="tsel-${t.id}" onclick="toggleTravellerSel('${t.id}','${t.firstName} ${t.lastName||''}','${t.id}')"
+    if(!travs.length){c.innerHTML=`<span style="font-size:0.8rem;color:var(--muted);font-weight:600;">No approved travellers yet. Share invite link!</span>`;}
+    else{c.innerHTML=travs.map(t=>`
+      <div id="tsel-${t.id}" onclick="toggleTravellerSel('${t.id}','${t.firstName} ${t.lastName||''}')"
         style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--light);border:1.5px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px;transition:all 0.2s;">
         <div class="mem-av" style="margin-right:0;">${initials(t.firstName)}</div>
         <div><div style="font-size:0.88rem;font-weight:700;">${t.firstName} ${t.lastName||''}</div>
@@ -1468,12 +1519,12 @@ function toggleTravellerSel(uid,name){
   if(idx>-1){selectedTravellers.splice(idx,1);el.style.background='';el.style.borderColor='';}
   else{selectedTravellers.push({userId:uid,name,advance:0});el.style.background='var(--blue-light)';el.style.borderColor='var(--blue)';}
 }
-function saveNewTrip(){
+async function saveNewTrip(){
   const name=document.getElementById('nt-name').value.trim();
   if(!name){toast('Enter trip name!','#dc2626');return;}
-  const d=ls();
+  const docId=uid();
   const trip={
-    id:uid(),name,
+    id:docId,name,
     start:document.getElementById('nt-start').value,
     end:document.getElementById('nt-end').value,
     days:+document.getElementById('nt-days').value||1,
@@ -1483,65 +1534,73 @@ function saveNewTrip(){
     travellers:selectedTravellers,
     organiserId:currentUser.id,createdAt:new Date().toISOString()
   };
-  d.trips.unshift(trip);sv(d);closeModal('modal-new-trip');
+  await db.collection('trips').doc(docId).set(trip);
+  closeModal('modal-new-trip');
   ['nt-name','nt-budget','nt-notes'].forEach(i=>document.getElementById(i).value='');
   selectedTravellers=[];
   toast('Trip created! 🎉','#16a34a');renderOrgTrips();
 }
-function openAddExpModal(){
-  const d=ls();const trip=d.trips.find(t=>t.id===activeTripId);if(!trip)return;
+async function openAddExpModal(){
+  const snap=await db.collection('trips').doc(activeTripId).get();
+  const trip=snap.data();if(!trip)return;
   const pb=document.getElementById('ae-paidby');
-  pb.innerHTML='<option value="">-- Select --</option>'+trip.travellers.map(m=>`<option>${m.name}</option>`).join('');
-  document.getElementById('ae-split-checks').innerHTML=trip.travellers.map(m=>`
+  const travellers=trip.travellers||[];
+  pb.innerHTML='<option value="">-- Select --</option>'+travellers.map(m=>`<option>${m.name}</option>`).join('');
+  document.getElementById('ae-split-checks').innerHTML=travellers.map(m=>`
     <label style="display:flex;align-items:center;gap:5px;background:var(--light);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:0.82rem;font-weight:700;font-family:var(--font);">
       <input type="checkbox" value="${m.name}" style="accent-color:var(--blue);width:16px;height:16px;"> ${m.name}
     </label>`).join('');
   document.getElementById('ae-date').value=trip.start||new Date().toISOString().split('T')[0];
-  openModal('modal-add-expense');
+  document.getElementById('modal-add-expense').classList.add('open');
 }
-function saveExpense(){
+async function saveExpense(){
   const cat=document.getElementById('ae-cat').value,amount=document.getElementById('ae-amount').value;
   if(!cat||!amount){toast('Category and amount required!','#dc2626');return;}
   const checked=[...document.querySelectorAll('#ae-split-checks input:checked')].map(c=>c.value);
-  const d=ls();
-  d.expenses.push({id:uid(),tripId:activeTripId,cat,note:document.getElementById('ae-note').value,
+  const docId=uid();
+  await db.collection('expenses').doc(docId).set({
+    id:docId,tripId:activeTripId,cat,
+    note:document.getElementById('ae-note').value,
     amount:+amount,date:document.getElementById('ae-date').value,
-    paidBy:document.getElementById('ae-paidby').value,splitAmong:checked,createdAt:new Date().toISOString()});
-  sv(d);closeModal('modal-add-expense');
+    paidBy:document.getElementById('ae-paidby').value,
+    splitAmong:checked,createdAt:new Date().toISOString()
+  });
+  closeModal('modal-add-expense');
   ['ae-note','ae-amount'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('ae-cat').selectedIndex=0;
   toast('Expense added ✓','#16a34a');renderOrgDetail();
 }
-function deleteExpense(eid){
-  const d=ls();d.expenses=d.expenses.filter(e=>e.id!==eid);sv(d);
+async function deleteExpense(eid){
+  await db.collection('expenses').doc(eid).delete();
   toast('Expense removed.','#dc2626');renderOrgDetail();
 }
 
 // ═══════════════════════════════════════════
 //  TRAVELLER
 // ═══════════════════════════════════════════
-function loadTrvDash(){
+async function loadTrvDash(){
   document.getElementById('trv-av').textContent=initials(currentUser.firstName);
   document.getElementById('trv-uname').textContent=currentUser.username;
   showScreen('screen-traveller');renderTrvTrips();
 }
-function renderTrvTrips(){
+async function renderTrvTrips(){
   document.getElementById('trv-trips-view').style.display='block';
   document.getElementById('trv-detail-view').style.display='none';
-  const d=ls();
-  const myTrips=d.trips.filter(t=>t.travellers.some(m=>m.userId===currentUser.id));
+  const d=await getAllData();
+  const myTrips=d.trips.filter(t=>(t.travellers||[]).some(m=>m.userId===currentUser.id));
   const grid=document.getElementById('trv-trips-grid');
   if(!myTrips.length){grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1"><span class="ei">🎒</span><p>Not added to any trips yet.<br>Ask your Organiser!</p></div>`;return;}
   grid.innerHTML=myTrips.map(t=>{
     const exps=d.expenses.filter(e=>e.tripId===t.id);
     const spent=exps.reduce((s,e)=>s+(+e.amount||0),0);
-    const perHead=t.travellers.length?Math.round(spent/t.travellers.length):0;
+    const travellers=t.travellers||[];
+    const perHead=travellers.length?Math.round(spent/travellers.length):0;
     return `<div class="trip-card-item" onclick="openTrvDetail('${t.id}')">
       <div class="tc-name">${t.name}</div>
       <div class="tc-dates">📅 ${fmt(t.start)} → ${fmt(t.end)}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
         <span class="badge badge-blue">☀️ ${t.days}D / 🌙 ${t.nights}N</span>
-        <span class="badge badge-green">👥 ${t.travellers.length} pax</span>
+        <span class="badge badge-green">👥 ${travellers.length} pax</span>
       </div>
       <div class="tc-bottom">
         <span style="font-weight:900;color:var(--orange);font-size:0.9rem;">My share: ₹${perHead.toLocaleString('en-IN')}</span>
@@ -1556,12 +1615,14 @@ function openTrvDetail(tid){
   document.getElementById('trv-detail-view').style.display='block';
   renderTrvDetail();
 }
-function renderTrvDetail(){
-  const d=ls();const trip=d.trips.find(t=>t.id===activeTripId);if(!trip)return;
+async function renderTrvDetail(){
+  const d=await getAllData();
+  const trip=d.trips.find(t=>t.id===activeTripId);if(!trip)return;
   const exps=d.expenses.filter(e=>e.tripId===activeTripId);
   const totalSpent=exps.reduce((s,e)=>s+(+e.amount||0),0);
-  const perHead=trip.travellers.length?Math.round(totalSpent/trip.travellers.length):0;
-  const me=trip.travellers.find(m=>m.userId===currentUser.id);
+  const travellers=trip.travellers||[];
+  const perHead=travellers.length?Math.round(totalSpent/travellers.length):0;
+  const me=travellers.find(m=>m.userId===currentUser.id);
   const adv=me?+me.advance||0:0,bal=perHead-adv;
   document.getElementById('trv-detail-view').innerHTML=`
     <div class="back-btn" onclick="renderTrvTrips()">← Back to Trips</div>
@@ -1569,7 +1630,7 @@ function renderTrvDetail(){
       <h2 style="font-family:var(--font-display);color:var(--blue2);font-size:1.4rem;margin-bottom:8px;">${trip.name}</h2>
       <div style="display:flex;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:0.8rem;font-weight:600;">
         ${trip.start?`<span>📅 ${fmt(trip.start)} → ${fmt(trip.end)}</span>`:''}
-        <span>☀️ ${trip.days}D / 🌙 ${trip.nights}N</span><span>👥 ${trip.travellers.length} pax</span>
+        <span>☀️ ${trip.days}D / 🌙 ${trip.nights}N</span><span>👥 ${travellers.length} pax</span>
       </div>
     </div>
     <div class="stats-row">
@@ -1591,28 +1652,36 @@ function renderTrvDetail(){
     </div>
   `;
   renderExpList(exps,'trv-exp-list',false);
-  const notes=(d.notes||[]).filter(n=>n.tripId===activeTripId&&n.byId===currentUser.id);
-  renderNotesList(notes,'trv-notes-list');
+  const myNotes=d.notes.filter(n=>n.tripId===activeTripId&&n.byId===currentUser.id);
+  renderNotesList(myNotes,'trv-notes-list');
 }
-function saveNote(){
+async function saveNote(){
   const text=document.getElementById('note-text').value.trim();
   if(!text){toast('Enter a note!','#dc2626');return;}
-  const d=ls();if(!d.notes)d.notes=[];
-  d.notes.push({id:uid(),tripId:activeTripId,by:`${currentUser.firstName} ${currentUser.lastName||''}`,byId:currentUser.id,text,date:new Date().toISOString().split('T')[0]});
-  sv(d);closeModal('modal-add-note');
+  const docId=uid();
+  await db.collection('notes').doc(docId).set({
+    id:docId,tripId:activeTripId,
+    by:`${currentUser.firstName} ${currentUser.lastName||''}`,
+    byId:currentUser.id,text,
+    date:new Date().toISOString().split('T')[0]
+  });
+  closeModal('modal-add-note');
   document.getElementById('note-text').value='';
   toast('Note sent! 📨','#16a34a');
   if(currentUser.role==='traveller') renderTrvDetail();
+  else renderOrgDetail();
 }
 
 // ═══════════════════════════════════════════
 //  PDF EXPORT
 // ═══════════════════════════════════════════
-function generatePdf(tid){
-  const d=ls();const trip=d.trips.find(t=>t.id===tid);if(!trip){toast('Trip not found.','#dc2626');return;}
+async function generatePdf(tid){
+  const d=await getAllData();
+  const trip=d.trips.find(t=>t.id===tid);if(!trip){toast('Trip not found.','#dc2626');return;}
   const exps=d.expenses.filter(e=>e.tripId===tid);
   const totalSpent=exps.reduce((s,e)=>s+(+e.amount||0),0);
-  const perHead=trip.travellers.length?Math.round(totalSpent/trip.travellers.length):0;
+  const travellers=trip.travellers||[];
+  const perHead=travellers.length?Math.round(totalSpent/travellers.length):0;
   const {jsPDF}=window.jspdf;const doc=new jsPDF();const pg=doc.internal.pageSize;
   let y=18;
   doc.setFillColor(59,130,246);doc.rect(0,0,pg.width,28,'F');
@@ -1623,7 +1692,7 @@ function generatePdf(tid){
   doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(100,116,139);
   if(trip.start)doc.text(`Dates: ${fmt(trip.start)} → ${fmt(trip.end)}`,14,y);
   doc.text(`Days: ${trip.days} / Nights: ${trip.nights}`,110,y);y+=5;
-  doc.text(`Travellers: ${trip.travellers.length}`,14,y);
+  doc.text(`Travellers: ${travellers.length}`,14,y);
   if(trip.budget)doc.text(`Budget: Rs ${Number(trip.budget).toLocaleString('en-IN')}`,110,y);y+=10;
   doc.setFillColor(239,246,255);
   doc.roundedRect(14,y,55,16,3,3,'F');doc.roundedRect(74,y,55,16,3,3,'F');doc.roundedRect(134,y,55,16,3,3,'F');
@@ -1637,7 +1706,7 @@ function generatePdf(tid){
   doc.text('Travellers & Balance',14,y);y+=3;
   doc.autoTable({startY:y,
     head:[['Name','Share (Rs)','Advance (Rs)','Balance']],
-    body:trip.travellers.map(m=>{const adv=+m.advance||0,bal=perHead-adv;
+    body:travellers.map(m=>{const adv=+m.advance||0,bal=perHead-adv;
       return[m.name,`Rs ${perHead.toLocaleString('en-IN')}`,`Rs ${adv.toLocaleString('en-IN')}`,
         bal>0?`Owes Rs ${bal.toLocaleString('en-IN')}`:(bal<0?`Overpaid Rs ${Math.abs(bal).toLocaleString('en-IN')}`:'Settled')];
     }),
@@ -1677,7 +1746,7 @@ function generatePdf(tid){
 }
 
 // ═══════════════════════════════════════════
-//  MODAL CLOSE ON OVERLAY CLICK / SWIPE
+//  MODAL CLOSE ON OVERLAY CLICK
 // ═══════════════════════════════════════════
 document.querySelectorAll('.overlay').forEach(el=>{
   el.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
