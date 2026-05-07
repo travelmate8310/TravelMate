@@ -10,8 +10,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
 <meta name="apple-mobile-web-app-title" content="TravelMate"/>
 <link rel="manifest" href="manifest.json"/>
-<link rel="apple-touch-icon" href="logo.png"/>
-<link rel="icon" type="image/png" href="logo.png"/>
+<link rel="apple-touch-icon" href="https://raw.githubusercontent.com/travelmate8310/TravelMate/main/logo.png"/>
+<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/travelmate8310/TravelMate/main/logo.png"/>
 <title>TravelMate ✈️</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800;900&family=Pacifico&display=swap" rel="stylesheet">
@@ -31,6 +31,8 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 </script>
+<!-- EmailJS for real OTP emails -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <style>
@@ -317,12 +319,17 @@ table.dtbl tr:hover td{background:var(--blue-light);}
   position:fixed;inset:0;z-index:500;
   overflow-y:auto;
   display:none;
-  padding:24px 16px 100px;
   background:linear-gradient(160deg,#fce7f3 0%,#dbeafe 60%,#ecfdf5 100%);
-  align-items:flex-start;justify-content:center;
 }
 #screen-signup.active{
+  display:block;
+}
+.signup-scroll-wrap{
+  min-height:100%;
   display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  padding:24px 16px 80px;
 }
 .signup-box{
   background:rgba(255,255,255,0.96);backdrop-filter:blur(16px);
@@ -630,7 +637,7 @@ table.dtbl tr:hover td{background:var(--blue-light);}
   <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:linear-gradient(160deg,#dbeafe 0%,#fef3c7 50%,#fce7f3 100%);">
     <div class="login-box">
       <div class="login-logo">
-        <img src="logo.png" alt="TravelMate" onerror="this.style.display='none'">
+        <img src="https://raw.githubusercontent.com/travelmate8310/TravelMate/main/logo.png" alt="TravelMate" onerror="this.style.display='none'">
         <h1>TravelMate</h1>
         <p>Plan trips · Split expenses · Travel happy</p>
       </div>
@@ -656,10 +663,12 @@ table.dtbl tr:hover td{background:var(--blue-light);}
 
 <!-- ════ SCREEN: SIGNUP ════ -->
 <div class="screen" id="screen-signup">
-  <div style="width:100%;display:flex;align-items:flex-start;justify-content:center;padding:24px 14px 100px;">
+  <div class="signup-scroll-wrap">
+  <div style="width:100%;max-width:520px;">
+    <button onclick="showScreen('screen-login')" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.7);border:1.5px solid rgba(255,255,255,0.9);border-radius:10px;padding:8px 14px;font-family:var(--font);font-weight:800;font-size:0.85rem;color:var(--blue2);cursor:pointer;margin-bottom:14px;backdrop-filter:blur(8px);">← Back to Login</button>
     <div class="signup-box">
       <div style="text-align:center;margin-bottom:20px;">
-        <img src="logo.png" alt="TravelMate" style="width:52px;height:52px;border-radius:12px;object-fit:cover;margin-bottom:8px;" onerror="this.style.display='none'">
+        <img src="https://raw.githubusercontent.com/travelmate8310/TravelMate/main/logo.png" alt="TravelMate" style="width:52px;height:52px;border-radius:12px;object-fit:cover;margin-bottom:8px;" onerror="this.style.display='none'">
         <div style="font-family:var(--font-display);font-size:1.6rem;background:linear-gradient(135deg,var(--pink),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">TravelMate</div>
         <p style="color:var(--muted);font-size:0.8rem;font-weight:600;margin-top:4px;">Create your account</p>
       </div>
@@ -725,8 +734,8 @@ table.dtbl tr:hover td{background:var(--blue-light);}
       </div>
       <div id="signup-step2" style="display:none;">
         <div class="otp-box">
-          <p style="font-size:0.85rem;color:var(--muted);font-weight:600;font-family:var(--font);">📧 OTP sent to your email. Enter it below.</p>
-          <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;font-family:var(--font);">Demo mode — OTP: <strong id="otp-hint" style="color:var(--blue)"></strong></div>
+        <p style="font-size:0.85rem;color:var(--muted);font-weight:600;font-family:var(--font);">📧 OTP sent to your email. Check your inbox (and spam folder).</p>
+          <div id="otp-send-status" style="font-size:0.78rem;font-weight:700;margin-top:6px;color:var(--green);font-family:var(--font);"></div>
           <div class="otp-input-row">
             <input class="otp-digit" maxlength="1" inputmode="numeric" oninput="otpNext(this,0)">
             <input class="otp-digit" maxlength="1" inputmode="numeric" oninput="otpNext(this,1)">
@@ -741,8 +750,9 @@ table.dtbl tr:hover td{background:var(--blue-light);}
           <button class="btn btn-ghost btn-sm" onclick="document.getElementById('signup-step1').style.display='block';document.getElementById('signup-step2').style.display='none';">← Back</button>
         </div>
       </div>
-    </div>
-  </div>
+    </div><!-- end signup-box -->
+  </div><!-- end signup-scroll-wrap inner -->
+  </div><!-- end signup-scroll-wrap -->
 </div>
 
 <!-- ════ SCREEN: PENDING ════ -->
@@ -764,7 +774,7 @@ table.dtbl tr:hover td{background:var(--blue-light);}
 <div class="screen" id="screen-admin">
   <div class="topnav">
     <div class="logo">
-      <img src="logo.png" alt="" onerror="this.style.display='none'">
+      <img src="https://raw.githubusercontent.com/travelmate8310/TravelMate/main/logo.png" alt="" onerror="this.style.display='none'">
       TravelMate
     </div>
     <div class="nav-right">
@@ -813,7 +823,7 @@ table.dtbl tr:hover td{background:var(--blue-light);}
 <div class="screen" id="screen-organiser">
   <div class="topnav">
     <div class="logo">
-      <img src="logo.png" alt="" onerror="this.style.display='none'">
+      <img src="https://raw.githubusercontent.com/travelmate8310/TravelMate/main/logo.png" alt="" onerror="this.style.display='none'">
       TravelMate
     </div>
     <div class="nav-right">
@@ -846,7 +856,7 @@ table.dtbl tr:hover td{background:var(--blue-light);}
 <div class="screen" id="screen-traveller">
   <div class="topnav">
     <div class="logo">
-      <img src="logo.png" alt="" onerror="this.style.display='none'">
+      <img src="https://raw.githubusercontent.com/travelmate8310/TravelMate/main/logo.png" alt="" onerror="this.style.display='none'">
       TravelMate
     </div>
     <div class="nav-right">
@@ -1139,12 +1149,41 @@ async function su_sendOtp(){
   ]);
   if(!emailSnap.empty){toast('Email already registered.','#dc2626');return;}
   if(!userSnap.empty){toast('Username taken. Already registered?','#dc2626');return;}
+
+  // Generate OTP
   generatedOtp=String(Math.floor(100000+Math.random()*900000));
-  document.getElementById('otp-hint').textContent=generatedOtp;
   pendingSignupData={fname,lname:document.getElementById('s-lname').value.trim(),dob,mobile,email,gender,role,pw,username,inviteOrgId};
-  document.getElementById('signup-step1').style.display='none';
-  document.getElementById('signup-step2').style.display='block';
-  toast('OTP sent! (Demo: see hint below)','#16a34a');
+
+  // Send real OTP via EmailJS
+  const sendBtn=document.querySelector('.btn-pink');
+  sendBtn.textContent='Sending OTP…';sendBtn.disabled=true;
+  try{
+    // ⚠️ REPLACE these 3 values with your EmailJS credentials (see setup guide below)
+    const EMAILJS_PUBLIC_KEY  = 'SHvJ0XoDWvz_ZAdNt';
+    const EMAILJS_SERVICE_ID  = 'service_xnohlq1';
+    const EMAILJS_TEMPLATE_ID = 'template_b6decsj';
+
+    emailjs.init(EMAILJS_PUBLIC_KEY);
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      to_email : email,
+      to_name  : fname,
+      otp_code : generatedOtp,
+      app_name : 'TravelMate'
+    });
+    document.getElementById('signup-step1').style.display='none';
+    document.getElementById('signup-step2').style.display='block';
+    document.getElementById('otp-send-status').textContent='✓ OTP sent to '+email;
+    toast('OTP sent to your email! 📧','#16a34a');
+  }catch(err){
+    console.error('EmailJS error:',err);
+    // Fallback: show OTP in UI so you can still test
+    document.getElementById('signup-step1').style.display='none';
+    document.getElementById('signup-step2').style.display='block';
+    document.getElementById('otp-send-status').textContent='⚠️ Email failed — Test OTP: '+generatedOtp;
+    toast('Email sending failed. See OTP on screen.','#d97706');
+  }finally{
+    sendBtn.textContent='Send OTP to Email →';sendBtn.disabled=false;
+  }
 }
 function otpNext(el,idx){
   el.value=el.value.replace(/[^0-9]/g,'');
