@@ -1109,42 +1109,46 @@ function catBg(c){return{hotel:'#ede9fe',fuel:'#dcfce7',food:'#fff7ed',transport
 function orgFullName(){return currentUser?`${currentUser.firstName} ${currentUser.lastName||''}`.trim():'';}
 
 // ═══════════════════════════════════════════
-//  APPROVAL EMAIL via EmailJS
+//  EMAIL via EmailJS — unified helper
 // ═══════════════════════════════════════════
+async function sendEmailJS(toEmail,toName,subject,messageBody){
+  const EMAILJS_PUBLIC_KEY  ='SHvJ0XoDWvz_ZAdNt';
+  const EMAILJS_SERVICE_ID  ='service_xnohlq1';
+  const EMAILJS_TEMPLATE_ID ='template_b6decsj';
+  emailjs.init(EMAILJS_PUBLIC_KEY);
+  await emailjs.send(EMAILJS_SERVICE_ID,EMAILJS_TEMPLATE_ID,{
+    to_email  : toEmail,
+    to_name   : toName,
+    otp_code  : messageBody,
+    app_name  : subject,
+    from_name : 'TravelMate',
+    reply_to  : toEmail
+  },EMAILJS_PUBLIC_KEY);
+}
+
 async function sendAdminNotificationEmail(user){
   try{
-    // Get admin email from Firestore
     const adminSnap=await db.collection('users').where('role','==','admin').limit(1).get();
-    if(adminSnap.empty)return;
+    if(adminSnap.empty){console.warn('No admin found for notification');return;}
     const admin=adminSnap.docs[0].data();
-    const EMAILJS_PUBLIC_KEY  ='SHvJ0XoDWvz_ZAdNt';
-    const EMAILJS_SERVICE_ID  ='service_xnohlq1';
-    const EMAILJS_TEMPLATE_ID ='template_b6decsj';
-    emailjs.init(EMAILJS_PUBLIC_KEY);
-    await emailjs.send(EMAILJS_SERVICE_ID,EMAILJS_TEMPLATE_ID,{
-      to_email : admin.email,
-      to_name  : admin.firstName,
-      otp_code : `New signup request from ${user.firstName} ${user.lastName||''} (${user.username}) — Role: ${user.role}. Please login to TravelMate admin panel to approve.`,
-      app_name : 'TravelMate — New Signup Request',
-      from_name: 'TravelMate',
-      reply_to : user.email
-    },EMAILJS_PUBLIC_KEY);
+    await sendEmailJS(
+      admin.email,
+      admin.firstName,
+      'TravelMate — New Signup Request',
+      `New signup request received!\n\nName: ${user.firstName} ${user.lastName||''}\nUsername: ${user.username}\nRole: ${user.role}\nEmail: ${user.email}\n\nPlease login to TravelMate admin panel to approve or reject.`
+    );
+    console.log('Admin notified at',admin.email);
   }catch(e){console.warn('Admin notification email failed:',e);}
 }
+
 async function sendApprovalEmail(user){
   try{
-    const EMAILJS_PUBLIC_KEY  ='SHvJ0XoDWvz_ZAdNt';
-    const EMAILJS_SERVICE_ID  ='service_xnohlq1';
-    const EMAILJS_TEMPLATE_ID ='template_b6decsj';
-    emailjs.init(EMAILJS_PUBLIC_KEY);
-    await emailjs.send(EMAILJS_SERVICE_ID,EMAILJS_TEMPLATE_ID,{
-      to_email : user.email,
-      to_name  : user.firstName,
-      otp_code : `Your TravelMate account has been approved! Your username is: ${user.username}. You can now log in at TravelMate.`,
-      app_name : 'TravelMate — Account Approved!',
-      from_name: 'TravelMate',
-      reply_to : user.email
-    },EMAILJS_PUBLIC_KEY);
+    await sendEmailJS(
+      user.email,
+      user.firstName,
+      'TravelMate — Your Account is Approved!',
+      `Your TravelMate account has been approved!\n\nYour login details:\nUsername: ${user.username}\n\nYou can now login and join your trips.\n\nWelcome to TravelMate!`
+    );
     console.log('Approval email sent to',user.email);
   }catch(e){console.warn('Approval email failed:',e);}
 }
@@ -1253,18 +1257,11 @@ async function su_sendOtp(){
   const sendBtn=document.querySelector('.btn-pink');
   sendBtn.textContent='Sending OTP…';sendBtn.disabled=true;
   try{
-    const EMAILJS_PUBLIC_KEY  ='SHvJ0XoDWvz_ZAdNt';
-    const EMAILJS_SERVICE_ID  ='service_xnohlq1';
-    const EMAILJS_TEMPLATE_ID ='template_b6decsj';
-    emailjs.init(EMAILJS_PUBLIC_KEY);
-    await emailjs.send(EMAILJS_SERVICE_ID,EMAILJS_TEMPLATE_ID,{
-      to_email : email,
-      to_name  : fname,
-      otp_code : generatedOtp,
-      app_name : 'TravelMate',
-      from_name: 'TravelMate',
-      reply_to : email
-    },EMAILJS_PUBLIC_KEY);
+    await sendEmailJS(
+      email, fname,
+      'TravelMate — Your OTP Code',
+      `Your TravelMate verification OTP is: ${generatedOtp}\n\nThis OTP is valid for 10 minutes. Do not share it with anyone.`
+    );
     document.getElementById('signup-step1').style.display='none';
     document.getElementById('signup-step2').style.display='block';
     document.getElementById('otp-send-status').textContent='✓ OTP sent to '+email;
@@ -1800,16 +1797,28 @@ async function openAddExpModal(){
   // Build paid-by options with organiser pre-selected (fix #7)
   pb.innerHTML=travellers.map(m=>`<option value="${m.name}" ${m.userId===currentUser.id?'selected':''}>${m.name}${m.userId===currentUser.id?' (You)':''}</option>`).join('');
   document.getElementById('ae-split-checks').innerHTML=travellers.map(m=>`
-    <label style="display:flex;align-items:center;gap:5px;background:var(--light);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:0.82rem;font-weight:700;font-family:var(--font);">
-      <input type="checkbox" value="${m.name}" checked style="accent-color:var(--blue);width:16px;height:16px;"> ${m.name}${m.userId===currentUser.id?' 👑':''}
-    </label>`).join('');
+    <div id="split-${m.userId}" onclick="toggleSplit(this,'${m.name}')"
+      style="display:flex;align-items:center;gap:8px;background:var(--blue-light);border:2px solid var(--blue);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:0.85rem;font-weight:700;font-family:var(--font);user-select:none;transition:all 0.15s;"
+      data-selected="true" data-name="${m.name}">
+      <span style="font-size:1rem;">✅</span>
+      <span>${m.name}${m.userId===currentUser.id?' 👑':''}</span>
+    </div>`).join('');
   document.getElementById('ae-date').value=trip.start||new Date().toISOString().split('T')[0];
   document.getElementById('modal-add-expense').classList.add('open');
+}
+function toggleSplit(el,name){
+  const selected=el.dataset.selected==='true';
+  el.dataset.selected=selected?'false':'true';
+  el.style.background=selected?'var(--light)':'var(--blue-light)';
+  el.style.borderColor=selected?'var(--border)':'var(--blue)';
+  el.querySelector('span').textContent=selected?'⭕':'✅';
 }
 async function saveExpense(){
   const cat=document.getElementById('ae-cat').value,amount=document.getElementById('ae-amount').value;
   if(!cat||!amount){toast('Category and amount required!','#dc2626');return;}
-  const checked=[...document.querySelectorAll('#ae-split-checks input:checked')].map(c=>c.value);
+  // Read from toggle divs instead of checkboxes
+  const checked=[...document.querySelectorAll('#ae-split-checks [data-selected="true"]')].map(el=>el.dataset.name);
+  if(checked.length===0){toast('Select at least one person to split among.','#dc2626');return;}
   const docId=uid();
   await db.collection('expenses').doc(docId).set({
     id:docId,tripId:activeTripId,cat,
