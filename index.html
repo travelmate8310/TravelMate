@@ -1131,6 +1131,7 @@ async function sendAdminNotificationEmail(user){
     },EMAILJS_PUBLIC_KEY);
   }catch(e){console.warn('Admin notification email failed:',e);}
 }
+async function sendApprovalEmail(user){
   try{
     const EMAILJS_PUBLIC_KEY  ='SHvJ0XoDWvz_ZAdNt';
     const EMAILJS_SERVICE_ID  ='service_xnohlq1';
@@ -1139,8 +1140,8 @@ async function sendAdminNotificationEmail(user){
     await emailjs.send(EMAILJS_SERVICE_ID,EMAILJS_TEMPLATE_ID,{
       to_email : user.email,
       to_name  : user.firstName,
-      otp_code : `Your username is: ${user.username}`,
-      app_name : 'TravelMate',
+      otp_code : `Your TravelMate account has been approved! Your username is: ${user.username}. You can now log in at TravelMate.`,
+      app_name : 'TravelMate — Account Approved!',
       from_name: 'TravelMate',
       reply_to : user.email
     },EMAILJS_PUBLIC_KEY);
