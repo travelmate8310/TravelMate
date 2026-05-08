@@ -652,12 +652,12 @@ table.dtbl tr:hover td{background:var(--blue-light);}
       </div>
       <div class="form-row">
         <label>Username</label>
-        <input type="text" id="login-user" placeholder="e.g. ganesh031099" autocomplete="username" inputmode="text">
+        <input type="text" id="login-user" placeholder="Your Username" autocomplete="username" inputmode="text">
       </div>
       <div class="form-row">
         <label>Password</label>
         <div class="pw-wrap">
-          <input type="password" id="login-pw" placeholder="Your password" autocomplete="current-password">
+          <input type="password" id="login-pw" placeholder="Your Password" autocomplete="current-password">
           <button class="pw-eye" type="button" onclick="togglePwVis('login-pw',this)">👁</button>
         </div>
       </div>
@@ -686,9 +686,9 @@ table.dtbl tr:hover td{background:var(--blue-light);}
       <div id="signup-step1">
         <div class="form-grid-2">
           <div class="form-row"><label>First Name *</label>
-            <input type="text" id="s-fname" placeholder="Ganesh" oninput="su_updatePreview()" autocomplete="given-name"></div>
+            <input type="text" id="s-fname" placeholder="Enter Your First Name" oninput="su_updatePreview()" autocomplete="given-name"></div>
           <div class="form-row"><label>Last Name</label>
-            <input type="text" id="s-lname" placeholder="Patil" autocomplete="family-name"></div>
+            <input type="text" id="s-lname" placeholder="Enter Your Last Name" autocomplete="family-name"></div>
         </div>
         <div class="form-row"><label>Date of Birth *</label>
           <input type="date" id="s-dob" oninput="su_updatePreview()"></div>
@@ -700,9 +700,9 @@ table.dtbl tr:hover td{background:var(--blue-light);}
           <span style="font-size:1.3rem;">🪪</span>
         </div>
         <div class="form-row"><label>Mobile Number *</label>
-          <input type="tel" id="s-mobile" placeholder="9876543210" maxlength="10" inputmode="numeric"></div>
+          <input type="tel" id="s-mobile" placeholder="XXXXXXXXXX" maxlength="10" inputmode="numeric"></div>
         <div class="form-row"><label>Email Address *</label>
-          <input type="email" id="s-email" placeholder="you@email.com" inputmode="email"></div>
+          <input type="email" id="s-email" placeholder="youremail_@gmail.com" inputmode="email"></div>
         <div class="form-grid-2">
           <div class="form-row"><label>Gender *</label>
             <select id="s-gender">
@@ -725,7 +725,7 @@ table.dtbl tr:hover td{background:var(--blue-light);}
             <div class="pw-rule" id="sr-len">✗ Min 8 chars</div>
             <div class="pw-rule" id="sr-cap">✗ Uppercase</div>
             <div class="pw-rule" id="sr-num">✗ Number</div>
-            <div class="pw-rule" id="sr-sym">✗ Symbol</div>
+            <div class="pw-rule" id="sr-sym">✗ Symbol (e.g.@,#,$,*) </div>
           </div>
         </div>
         <div class="form-row"><label>Confirm Password *</label>
@@ -963,6 +963,29 @@ table.dtbl tr:hover td{background:var(--blue-light);}
   </div>
 </div>
 
+<!-- Custom Confirm Modal (replaces browser alert/confirm) -->
+<div class="overlay" id="modal-confirm">
+  <div class="modal" style="max-width:380px;">
+    <h3 id="confirm-title">Are you sure?</h3>
+    <p id="confirm-msg" style="color:var(--muted);font-size:0.9rem;font-weight:600;margin-bottom:20px;font-family:var(--font);line-height:1.6;"></p>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-ghost btn-full" onclick="confirmResolve(false)">Cancel</button>
+      <button class="btn btn-full" id="confirm-ok-btn" onclick="confirmResolve(true)">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Travellers Modal -->
+<div class="overlay" id="modal-edit-travellers">
+  <div class="modal">
+    <button class="modal-x" onclick="closeModal('modal-edit-travellers')">×</button>
+    <h3>👥 Edit Travellers</h3>
+    <p style="font-size:0.8rem;color:var(--muted);font-weight:600;margin-bottom:14px;font-family:var(--font);">Add or remove travellers from this trip. Organiser is always included.</p>
+    <div id="edit-travellers-list" style="margin-bottom:16px;"></div>
+    <button class="btn btn-blue btn-full" onclick="saveEditedTravellers()">Save Changes ✓</button>
+  </div>
+</div>
+
 <!-- Install Banner -->
 <div id="install-banner">
   <div class="ib-icon">📱</div>
@@ -977,15 +1000,34 @@ table.dtbl tr:hover td{background:var(--blue-light);}
 <!-- Toast -->
 <div id="toast"></div>
 
+
 <script>
 // ═══════════════════════════════════════════
-//  FIREBASE DATA LAYER  (replaces localStorage ls/sv)
+//  SESSION PERSISTENCE  (Fix 1: survive refresh)
 // ═══════════════════════════════════════════
-// All reads/writes go to Firestore collections: users, trips, expenses, notes
-// Keeps the same data shape so all existing render functions work unchanged.
-
+function saveSession(user){ try{sessionStorage.setItem('tm_user',JSON.stringify(user));}catch(e){} }
+function clearSession(){ try{sessionStorage.removeItem('tm_user');}catch(e){} }
+async function restoreSession(){
+  try{
+    const saved=sessionStorage.getItem('tm_user');
+    if(!saved)return false;
+    const u=JSON.parse(saved);
+    // Re-verify user still exists and is active in Firestore
+    const snap=await db.collection('users').doc(u.id).get();
+    if(!snap.exists)return false;
+    const fresh={id:snap.id,...snap.data()};
+    if(fresh.status!=='active')return false;
+    currentUser=fresh;
+    if(fresh.role==='admin')loadAdminDash();
+    else if(fresh.role==='organiser')loadOrgDash();
+    else loadTrvDash();
+    return true;
+  }catch(e){return false;}
+}
+// Try restoring session on load
+restoreSession();
 async function getAllData(){
-  const [usersSnap,tripsSnap,expSnap,notesSnap] = await Promise.all([
+  const [usersSnap,tripsSnap,expSnap,notesSnap]=await Promise.all([
     db.collection('users').get(),
     db.collection('trips').get(),
     db.collection('expenses').get(),
@@ -994,27 +1036,52 @@ async function getAllData(){
   return {
     users:  usersSnap.docs.map(d=>({id:d.id,...d.data()})),
     trips:  tripsSnap.docs.map(d=>({id:d.id,...d.data()})),
-    expenses: expSnap.docs.map(d=>({id:d.id,...d.data()})),
+    expenses:expSnap.docs.map(d=>({id:d.id,...d.data()})),
     notes:  notesSnap.docs.map(d=>({id:d.id,...d.data()}))
   };
 }
-// Convenience: save/update a single doc
-async function setDoc(col,docId,data){ await db.collection(col).doc(docId).set(data,{merge:true}); }
-async function delDoc(col,docId){ await db.collection(col).doc(docId).delete(); }
+
+// ═══════════════════════════════════════════
+//  CUSTOM CONFIRM (replaces browser alert/confirm)
+// ═══════════════════════════════════════════
+let _confirmResolve=null;
+function showConfirm(msg,title='Are you sure?',okLabel='Confirm',okColor='var(--red)'){
+  return new Promise(resolve=>{
+    _confirmResolve=resolve;
+    document.getElementById('confirm-title').textContent=title;
+    document.getElementById('confirm-msg').textContent=msg;
+    const btn=document.getElementById('confirm-ok-btn');
+    btn.textContent=okLabel;
+    btn.style.background=okColor;
+    btn.style.color='#fff';
+    btn.style.border='none';
+    document.getElementById('modal-confirm').classList.add('open');
+  });
+}
+function confirmResolve(val){
+  document.getElementById('modal-confirm').classList.remove('open');
+  if(_confirmResolve) _confirmResolve(val);
+  _confirmResolve=null;
+}
+function showAlert(msg,title='Notice'){
+  return showConfirm(msg,title,'OK','var(--blue)');
+}
 
 // ═══════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════
-let currentUser=null,activeTripId=null,selectedTravellers=[],suPwOk=false,generatedOtp=null,pendingSignupData=null,inviteOrgId=null;
+let currentUser=null,activeTripId=null,selectedTravellers=[],suPwOk=false,
+    generatedOtp=null,pendingSignupData=null,inviteOrgId=null,
+    editTravellersSelected=[];
 
 // ═══════════════════════════════════════════
 //  UTILS
 // ═══════════════════════════════════════════
-function uid(){ return Math.random().toString(36).slice(2,10); }
-function initials(n){ return (n||'?').trim().split(' ').map(p=>p[0]).join('').toUpperCase().slice(0,2); }
+function uid(){return Math.random().toString(36).slice(2,10);}
+function initials(n){return (n||'?').trim().split(' ').map(p=>p[0]).join('').toUpperCase().slice(0,2);}
 function genUsername(fname,dob){
-  if(!fname||!dob) return null;
-  const d=new Date(dob);if(isNaN(d)) return null;
+  if(!fname||!dob)return null;
+  const d=new Date(dob);if(isNaN(d))return null;
   const dd=String(d.getDate()).padStart(2,'0');
   const mm=String(d.getMonth()+1).padStart(2,'0');
   const yy=String(d.getFullYear()).slice(2);
@@ -1025,8 +1092,8 @@ function genUserId(role,users){
   const pre={admin:'TM-ADM',organiser:'TM-ORG',traveller:'TM-TRV'}[role]||'TM-USR';
   return `${pre}-${n}`;
 }
-function fmt(d){ if(!d) return '—'; const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}); }
-function fmtShort(d){ if(!d) return ''; const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-IN',{day:'numeric',month:'short'}); }
+function fmt(d){if(!d)return '—';const dt=new Date(d+'T00:00:00');return dt.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});}
+function fmtShort(d){if(!d)return '';const dt=new Date(d+'T00:00:00');return dt.toLocaleDateString('en-IN',{day:'numeric',month:'short'});}
 function toast(msg,col){
   const el=document.getElementById('toast');
   el.textContent=msg;el.style.background=col||'#1e293b';
@@ -1037,9 +1104,50 @@ function togglePwVis(id,btn){
   el.type=el.type==='password'?'text':'password';
   btn.textContent=el.type==='password'?'👁':'🙈';
 }
-function catIcon(c){ return {hotel:'🏨',fuel:'⛽',food:'🍽',transport:'🚌',entry:'🎢',shopping:'🛍',misc:'📦'}[c]||'💰'; }
-function catLabel(c){ return {hotel:'Hotel/Stay',fuel:'Fuel',food:'Food & Drinks',transport:'Transport',entry:'Entry/Tickets',shopping:'Shopping',misc:'Misc'}[c]||c; }
-function catBg(c){ return {hotel:'#ede9fe',fuel:'#dcfce7',food:'#fff7ed',transport:'#dbeafe',entry:'#fce7f3',shopping:'#fef9c3',misc:'#f1f5f9'}[c]||'#f1f5f9'; }
+function catIcon(c){return{hotel:'🏨',fuel:'⛽',food:'🍽',transport:'🚌',entry:'🎢',shopping:'🛍',misc:'📦'}[c]||'💰';}
+function catLabel(c){return{hotel:'Hotel/Stay',fuel:'Fuel',food:'Food & Drinks',transport:'Transport',entry:'Entry/Tickets',shopping:'Shopping',misc:'Misc'}[c]||c;}
+function catBg(c){return{hotel:'#ede9fe',fuel:'#dcfce7',food:'#fff7ed',transport:'#dbeafe',entry:'#fce7f3',shopping:'#fef9c3',misc:'#f1f5f9'}[c]||'#f1f5f9';}
+function orgFullName(){return currentUser?`${currentUser.firstName} ${currentUser.lastName||''}`.trim():'';}
+
+// ═══════════════════════════════════════════
+//  APPROVAL EMAIL via EmailJS
+// ═══════════════════════════════════════════
+async function sendAdminNotificationEmail(user){
+  try{
+    // Get admin email from Firestore
+    const adminSnap=await db.collection('users').where('role','==','admin').limit(1).get();
+    if(adminSnap.empty)return;
+    const admin=adminSnap.docs[0].data();
+    const EMAILJS_PUBLIC_KEY  ='SHvJ0XoDWvz_ZAdNt';
+    const EMAILJS_SERVICE_ID  ='service_xnohlq1';
+    const EMAILJS_TEMPLATE_ID ='template_b6decsj';
+    emailjs.init(EMAILJS_PUBLIC_KEY);
+    await emailjs.send(EMAILJS_SERVICE_ID,EMAILJS_TEMPLATE_ID,{
+      to_email : admin.email,
+      to_name  : admin.firstName,
+      otp_code : `New signup request from ${user.firstName} ${user.lastName||''} (${user.username}) — Role: ${user.role}. Please login to TravelMate admin panel to approve.`,
+      app_name : 'TravelMate — New Signup Request',
+      from_name: 'TravelMate',
+      reply_to : user.email
+    },EMAILJS_PUBLIC_KEY);
+  }catch(e){console.warn('Admin notification email failed:',e);}
+}
+  try{
+    const EMAILJS_PUBLIC_KEY  ='SHvJ0XoDWvz_ZAdNt';
+    const EMAILJS_SERVICE_ID  ='service_xnohlq1';
+    const EMAILJS_TEMPLATE_ID ='template_b6decsj';
+    emailjs.init(EMAILJS_PUBLIC_KEY);
+    await emailjs.send(EMAILJS_SERVICE_ID,EMAILJS_TEMPLATE_ID,{
+      to_email : user.email,
+      to_name  : user.firstName,
+      otp_code : `Your username is: ${user.username}`,
+      app_name : 'TravelMate',
+      from_name: 'TravelMate',
+      reply_to : user.email
+    },EMAILJS_PUBLIC_KEY);
+    console.log('Approval email sent to',user.email);
+  }catch(e){console.warn('Approval email failed:',e);}
+}
 
 // ═══════════════════════════════════════════
 //  INVITE LINK CHECK
@@ -1061,7 +1169,7 @@ function catBg(c){ return {hotel:'#ede9fe',fuel:'#dcfce7',food:'#fff7ed',transpo
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   const sc=document.getElementById(id);
-  if(sc){ sc.classList.add('active'); }
+  if(sc)sc.classList.add('active');
   window.scrollTo(0,0);
 }
 
@@ -1079,7 +1187,7 @@ async function doLogin(){
   try{
     const snap=await db.collection('users').where('username','==',user).limit(1).get();
     if(snap.empty){
-      errEl.innerHTML='Username not found. Check spelling (e.g. <strong>ganesh031099</strong>).';
+      errEl.innerHTML='Username not found. Check spelling (e.g. <strong>lowercase_uppercase</strong>).';
       errEl.style.display='block';return;
     }
     const found={id:snap.docs[0].id,...snap.docs[0].data()};
@@ -1087,19 +1195,21 @@ async function doLogin(){
     if(found.status==='pending'){document.getElementById('pending-email').textContent=found.email;showScreen('screen-pending');return;}
     if(found.status==='rejected'){errEl.textContent='Account not approved. Contact admin.';errEl.style.display='block';return;}
     if(found.status==='suspended'){errEl.textContent='Account suspended. Contact admin.';errEl.style.display='block';return;}
+    if(found.status==='deleted'){errEl.textContent='Account not found.';errEl.style.display='block';return;}
     currentUser=found;
-    if(found.role==='admin') loadAdminDash();
-    else if(found.role==='organiser') loadOrgDash();
+    saveSession(found);
+    if(found.role==='admin')loadAdminDash();
+    else if(found.role==='organiser')loadOrgDash();
     else loadTrvDash();
   }catch(e){
     errEl.textContent='Connection error. Check internet and try again.';errEl.style.display='block';
-    console.error(e);
   }finally{
     btn.textContent='Sign In →';btn.disabled=false;
   }
 }
 function doLogout(){
   currentUser=null;activeTripId=null;
+  clearSession();
   showScreen('screen-login');
   document.getElementById('login-user').value='';
   document.getElementById('login-pw').value='';
@@ -1119,7 +1229,7 @@ function su_checkPw(){
   const rules={'sr-len':pw.length>=8,'sr-cap':/[A-Z]/.test(pw),'sr-num':/[0-9]/.test(pw),'sr-sym':/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pw)};
   const labels={'sr-len':'Min 8 chars','sr-cap':'Uppercase','sr-num':'Number','sr-sym':'Symbol'};
   suPwOk=Object.values(rules).every(Boolean);
-  for(const[id,ok] of Object.entries(rules)){
+  for(const[id,ok]of Object.entries(rules)){
     const el=document.getElementById(id);
     el.className='pw-rule'+(ok?' ok':' fail');
     el.textContent=(ok?'✓ ':'✗ ')+labels[id];
@@ -1143,43 +1253,35 @@ async function su_sendOtp(){
   if(!/^\d{10}$/.test(mobile)){toast('Enter valid 10-digit mobile.','#dc2626');return;}
   const username=genUsername(fname,dob);
   if(!username){toast('Check name and DOB.','#dc2626');return;}
-  // Check duplicates in Firestore
   const [emailSnap,userSnap]=await Promise.all([
     db.collection('users').where('email','==',email).limit(1).get(),
     db.collection('users').where('username','==',username).limit(1).get()
   ]);
   if(!emailSnap.empty){toast('Email already registered.','#dc2626');return;}
   if(!userSnap.empty){toast('Username taken. Already registered?','#dc2626');return;}
-
-  // Generate OTP
   generatedOtp=String(Math.floor(100000+Math.random()*900000));
   pendingSignupData={fname,lname:document.getElementById('s-lname').value.trim(),dob,mobile,email,gender,role,pw,username,inviteOrgId};
-
-  // Send real OTP via EmailJS
   const sendBtn=document.querySelector('.btn-pink');
   sendBtn.textContent='Sending OTP…';sendBtn.disabled=true;
   try{
-    // ⚠️ REPLACE these 3 values with your EmailJS credentials (see setup guide below)
-    const EMAILJS_PUBLIC_KEY  = 'SHvJ0XoDWvz_ZAdNt';
-    const EMAILJS_SERVICE_ID  = 'service_xnohlq1';
-    const EMAILJS_TEMPLATE_ID = 'template_b6decsj';
-
+    const EMAILJS_PUBLIC_KEY  ='SHvJ0XoDWvz_ZAdNt';
+    const EMAILJS_SERVICE_ID  ='service_xnohlq1';
+    const EMAILJS_TEMPLATE_ID ='template_b6decsj';
     emailjs.init(EMAILJS_PUBLIC_KEY);
-    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-      to_email  : email,      // must match "To Email" field in EmailJS template
-      to_name   : fname,
-      otp_code  : generatedOtp,
-      app_name  : 'TravelMate',
-      from_name : 'TravelMate',
-      reply_to  : email
-    }, EMAILJS_PUBLIC_KEY);
+    await emailjs.send(EMAILJS_SERVICE_ID,EMAILJS_TEMPLATE_ID,{
+      to_email : email,
+      to_name  : fname,
+      otp_code : generatedOtp,
+      app_name : 'TravelMate',
+      from_name: 'TravelMate',
+      reply_to : email
+    },EMAILJS_PUBLIC_KEY);
     document.getElementById('signup-step1').style.display='none';
     document.getElementById('signup-step2').style.display='block';
     document.getElementById('otp-send-status').textContent='✓ OTP sent to '+email;
-    toast('OTP sent to your email! 📧','#16a34a');
+    toast('OTP sent! Check your email 📧','#16a34a');
   }catch(err){
     console.error('EmailJS error:',err);
-    // Fallback: show OTP in UI so you can still test
     document.getElementById('signup-step1').style.display='none';
     document.getElementById('signup-step2').style.display='block';
     document.getElementById('otp-send-status').textContent='⚠️ Email failed — Test OTP: '+generatedOtp;
@@ -1192,14 +1294,13 @@ function otpNext(el,idx){
   el.value=el.value.replace(/[^0-9]/g,'');
   if(el.value.length===1){
     const inputs=document.querySelectorAll('.otp-digit');
-    if(idx<5) inputs[idx+1].focus();
+    if(idx<5)inputs[idx+1].focus();
   }
 }
 async function su_verifyOtp(){
   const digits=[...document.querySelectorAll('.otp-digit')].map(i=>i.value).join('');
   if(digits.length!==6){toast('Enter complete 6-digit OTP.','#dc2626');return;}
   if(digits!==generatedOtp){toast('Incorrect OTP.','#dc2626');return;}
-  // Get user count for ID generation
   const usersSnap=await db.collection('users').get();
   const allUsers=usersSnap.docs.map(d=>d.data());
   const isInvite=!!pendingSignupData.inviteOrgId;
@@ -1221,6 +1322,8 @@ async function su_verifyOtp(){
     createdAt:new Date().toISOString()
   };
   await db.collection('users').doc(docId).set(user);
+  // Notify admin of new signup (only for non-invite signups needing approval)
+  if(!isInvite){ sendAdminNotificationEmail(user); }
   generatedOtp=null;pendingSignupData=null;
   [...document.querySelectorAll('.otp-digit')].forEach(i=>i.value='');
   document.getElementById('signup-step1').style.display='block';
@@ -1230,7 +1333,7 @@ async function su_verifyOtp(){
 }
 
 // ═══════════════════════════════════════════
-//  ADMIN DASHBOARD
+//  ADMIN
 // ═══════════════════════════════════════════
 async function loadAdminDash(){
   document.getElementById('admin-av').textContent=initials(currentUser.firstName);
@@ -1244,7 +1347,7 @@ async function renderAdminStats(){
   const pending=d.users.filter(u=>u.status==='pending').length;
   document.getElementById('admin-stats').innerHTML=`
     <div class="stat-box"><div class="sv" style="color:var(--yellow)">${pending}</div><div class="sl">Pending</div></div>
-    <div class="stat-box"><div class="sv" style="color:var(--blue)">${d.users.filter(u=>u.role!=='admin').length}</div><div class="sl">Users</div></div>
+    <div class="stat-box"><div class="sv" style="color:var(--blue)">${d.users.filter(u=>u.role!=='admin'&&u.status!=='deleted').length}</div><div class="sl">Users</div></div>
     <div class="stat-box"><div class="sv" style="color:var(--orange)">${d.users.filter(u=>u.role==='organiser'&&u.status==='active').length}</div><div class="sl">Organisers</div></div>
     <div class="stat-box"><div class="sv" style="color:var(--pink)">${d.users.filter(u=>u.role==='traveller'&&u.status==='active').length}</div><div class="sl">Travellers</div></div>
     <div class="stat-box"><div class="sv" style="color:var(--green)">${d.trips.length}</div><div class="sl">Trips</div></div>
@@ -1254,15 +1357,15 @@ async function adminTab(tab){
   ['pending','users','trips'].forEach(t=>{
     document.getElementById('admin-tab-'+t).style.display=t===tab?'block':'none';
     const btn=document.getElementById('atab-'+t);
-    if(btn){btn.className=t===tab?'btn btn-blue btn-sm':'btn btn-ghost btn-sm';}
+    if(btn)btn.className=t===tab?'btn btn-blue btn-sm':'btn btn-ghost btn-sm';
   });
   document.querySelectorAll('#admin-bottom-nav .bn-item').forEach((el,i)=>{
     el.classList.toggle('active',['pending','users','trips'][i]===tab);
   });
   const d=await getAllData();
-  if(tab==='pending') renderAdminPending(d);
-  else if(tab==='users') renderAdminUsers(d);
-  else if(tab==='trips') renderAdminTrips(d);
+  if(tab==='pending')renderAdminPending(d);
+  else if(tab==='users')renderAdminUsers(d);
+  else if(tab==='trips')renderAdminTrips(d);
 }
 function renderAdminPending(d){
   const pend=d.users.filter(u=>u.status==='pending');
@@ -1285,7 +1388,7 @@ function renderAdminPending(d){
     </div>`).join('');
 }
 function renderAdminUsers(d){
-  const users=d.users.filter(u=>u.role!=='admin');
+  const users=d.users.filter(u=>u.role!=='admin'&&u.status!=='deleted');
   const el=document.getElementById('admin-users-content');
   if(!users.length){el.innerHTML=`<div class="empty-state"><span class="ei">👥</span><p>No users yet.</p></div>`;return;}
   el.innerHTML=users.map(u=>`
@@ -1305,7 +1408,8 @@ function renderAdminUsers(d){
         </div>
         <div style="display:flex;gap:6px;">
           ${u.status==='pending'?`<button class="btn btn-green btn-xs" onclick="approveUser('${u.id}')">✓ Approve</button>`:''}
-          ${u.status==='active'?`<button class="btn btn-ghost btn-xs" style="color:var(--red);border-color:var(--red);" onclick="suspendUser('${u.id}')">Suspend</button>`:''}
+          ${u.status==='active'?`<button class="btn btn-ghost btn-xs" style="color:var(--red);border-color:var(--red);" onclick="suspendUser('${u.id}')">⏸ Suspend</button>`:''}
+          ${u.status==='suspended'?`<button class="btn btn-green btn-xs" onclick="activateUser('${u.id}')">▶ Activate</button>`:''}
           <button class="btn btn-red btn-xs" onclick="deleteUser('${u.id}','${u.firstName}')">🗑 Delete</button>
         </div>
       </div>
@@ -1339,26 +1443,39 @@ async function approveUser(id){
   await db.collection('users').doc(id).update({status:'active'});
   const snap=await db.collection('users').doc(id).get();
   const u=snap.data();
-  toast(`✓ ${u.firstName} approved! Username: ${u.username}`,'#16a34a');
+  // Send approval email
+  await sendApprovalEmail(u);
+  toast(`✓ ${u.firstName} approved! Email sent with username.`,'#16a34a');
   await renderAdminStats();adminTab('pending');
 }
 async function rejectUser(id){
-  if(!confirm('Reject this user?'))return;
+  const ok=await showConfirm('This user will be rejected and cannot log in.','Reject User?','Reject','var(--red)');
+  if(!ok)return;
   await db.collection('users').doc(id).update({status:'rejected'});
   toast('User rejected.','#dc2626');await renderAdminStats();adminTab('pending');
 }
 async function suspendUser(id){
-  if(!confirm('Suspend this user?'))return;
+  const ok=await showConfirm('This user will be suspended and cannot log in.','Suspend User?','Suspend','var(--yellow)');
+  if(!ok)return;
   await db.collection('users').doc(id).update({status:'suspended'});
   toast('User suspended.','#d97706');await renderAdminStats();adminTab('users');
 }
+async function activateUser(id){
+  await db.collection('users').doc(id).update({status:'active'});
+  toast('User activated ✓','#16a34a');
+  await renderAdminStats();adminTab('users');
+}
 async function deleteUser(id,name){
-  if(!confirm(`Permanently delete user "${name}"?`))return;
-  await db.collection('users').doc(id).delete();
-  toast(`${name} deleted.`,'#dc2626');await renderAdminStats();adminTab('users');
+  const ok=await showConfirm(`Permanently delete "${name}"? This cannot be undone.`,'Delete User?','Delete','var(--red)');
+  if(!ok)return;
+  // Use update to mark as deleted — avoids Firestore permission deny on .delete()
+  await db.collection('users').doc(id).update({status:'deleted',deletedAt:new Date().toISOString()});
+  toast(`${name} deleted.`,'#dc2626');
+  await renderAdminStats();adminTab('users');
 }
 async function adminDeleteTrip(tid){
-  if(!confirm('Delete this trip and all its expenses?'))return;
+  const ok=await showConfirm('This will permanently delete the trip and all its expenses.','Delete Trip?','Delete','var(--red)');
+  if(!ok)return;
   const [expSnap,notesSnap]=await Promise.all([
     db.collection('expenses').where('tripId','==',tid).get(),
     db.collection('notes').where('tripId','==',tid).get()
@@ -1441,7 +1558,10 @@ async function renderOrgDetail(){
       <div class="stat-box"><div class="sv" style="color:var(--pink);">${exps.length}</div><div class="sl">Expenses</div></div>
     </div>
     <div class="card">
-      <div class="card-title">👥 Travellers & Advance</div>
+      <div class="sec-head" style="margin-bottom:12px;">
+        <div class="card-title" style="margin-bottom:0;">👥 Travellers & Advance</div>
+        <button class="btn btn-ghost btn-sm" onclick="openEditTravellers()">✏️ Edit</button>
+      </div>
       <div class="tbl-wrap"><table class="dtbl" style="min-width:380px;">
         <thead><tr><th>Name</th><th>Share</th><th>Advance (₹)</th><th>Balance</th></tr></thead>
         <tbody id="mem-tbody"></tbody>
@@ -1451,13 +1571,13 @@ async function renderOrgDetail(){
     <div class="card">
       <div class="sec-head">
         <div class="card-title" style="margin-bottom:0;">💸 Expenses</div>
-        <div style="display:flex;gap:7px;flex-wrap:wrap;">
-          <button class="btn btn-orange btn-sm" onclick="openAddExpModal()">＋ Add</button>
-          <button class="btn btn-blue btn-sm" onclick="generatePdf('${trip.id}')">📄 PDF</button>
-          <button class="btn btn-red btn-sm" onclick="orgDeleteTrip('${trip.id}')">🗑 Delete</button>
-        </div>
+        <button class="btn btn-orange btn-sm" onclick="openAddExpModal()">＋ Add Expense</button>
       </div>
       <div id="exp-list" style="margin-top:14px;"></div>
+      <div style="display:flex;gap:10px;margin-top:16px;padding-top:14px;border-top:1.5px solid var(--border);">
+        <button class="btn btn-blue btn-full" onclick="generatePdf('${trip.id}')">📄 Download PDF</button>
+        <button class="btn btn-red" style="flex-shrink:0;padding:10px 16px;" onclick="orgDeleteTrip('${trip.id}')">🗑 Delete Trip</button>
+      </div>
     </div>
     <div class="card">
       <div class="card-title">📝 Notes from Travellers</div>
@@ -1468,6 +1588,67 @@ async function renderOrgDetail(){
   renderExpList(exps,'exp-list',true);
   renderNotesList(notes,'notes-list');
 }
+
+// ── Edit Travellers Modal ──
+async function openEditTravellers(){
+  const d=await getAllData();
+  const trip=d.trips.find(t=>t.id===activeTripId);if(!trip)return;
+  const currentTravellers=trip.travellers||[];
+  const allTravellers=d.users.filter(u=>u.role==='traveller'&&u.status==='active');
+  // Organiser is always first and cannot be removed
+  const orgEntry={userId:currentUser.id,name:orgFullName(),advance:0,isOrg:true};
+  const orgInTrip=currentTravellers.find(m=>m.userId===currentUser.id);
+  if(orgInTrip)orgEntry.advance=orgInTrip.advance||0;
+  editTravellersSelected=[...currentTravellers];
+  // Make sure organiser is in the list
+  if(!editTravellersSelected.find(m=>m.userId===currentUser.id)){
+    editTravellersSelected.unshift(orgEntry);
+  }
+  const listEl=document.getElementById('edit-travellers-list');
+  listEl.innerHTML=`
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--blue-light);border:1.5px solid var(--blue);border-radius:10px;margin-bottom:8px;opacity:0.8;">
+      <div class="mem-av" style="margin-right:0;background:linear-gradient(135deg,#f97316,#ea580c);">${initials(currentUser.firstName)}</div>
+      <div style="flex:1;"><div style="font-size:0.88rem;font-weight:800;">${orgFullName()} (You — Organiser)</div></div>
+      <span style="font-size:0.75rem;font-weight:700;color:var(--blue);">Always included</span>
+    </div>
+    ${allTravellers.map(t=>{
+      const isSelected=editTravellersSelected.some(m=>m.userId===t.id);
+      return `<div id="etsel-${t.id}" onclick="toggleEditTraveller('${t.id}','${t.firstName} ${t.lastName||''}')"
+        style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:${isSelected?'var(--blue-light)':'var(--light)'};border:1.5px solid ${isSelected?'var(--blue)':'var(--border)'};border-radius:10px;cursor:pointer;margin-bottom:6px;transition:all 0.2s;">
+        <div class="mem-av" style="margin-right:0;">${initials(t.firstName)}</div>
+        <div style="flex:1;"><div style="font-size:0.88rem;font-weight:700;">${t.firstName} ${t.lastName||''}</div>
+        <div style="font-size:0.72rem;color:var(--muted);">${t.username}</div></div>
+        <span style="font-size:1rem;">${isSelected?'✅':'⭕'}</span>
+      </div>`;
+    }).join('')}
+    ${allTravellers.length===0?`<p style="font-size:0.85rem;color:var(--muted);font-weight:600;text-align:center;padding:16px 0;">No approved travellers found. Share your invite link!</p>`:''}
+  `;
+  openModal('modal-edit-travellers');
+}
+function toggleEditTraveller(tUid,name){
+  const el=document.getElementById('etsel-'+tUid);
+  const idx=editTravellersSelected.findIndex(m=>m.userId===tUid);
+  if(idx>-1){
+    editTravellersSelected.splice(idx,1);
+    el.style.background='var(--light)';el.style.borderColor='var(--border)';
+    el.querySelector('span:last-child').textContent='⭕';
+  }else{
+    editTravellersSelected.push({userId:tUid,name,advance:0});
+    el.style.background='var(--blue-light)';el.style.borderColor='var(--blue)';
+    el.querySelector('span:last-child').textContent='✅';
+  }
+}
+async function saveEditedTravellers(){
+  // Always ensure organiser is in travellers
+  if(!editTravellersSelected.find(m=>m.userId===currentUser.id)){
+    editTravellersSelected.unshift({userId:currentUser.id,name:orgFullName(),advance:0});
+  }
+  await db.collection('trips').doc(activeTripId).update({travellers:editTravellersSelected});
+  closeModal('modal-edit-travellers');
+  toast('Travellers updated ✓','#16a34a');
+  renderOrgDetail();
+}
+
 function renderMemberTable(trip,perHead,d){
   const tbody=document.getElementById('mem-tbody');if(!tbody)return;
   const travellers=trip.travellers||[];
@@ -1475,10 +1656,17 @@ function renderMemberTable(trip,perHead,d){
     const adv=+m.advance||0,bal=perHead-adv;
     const balStyle=bal>0?'color:var(--red);':'color:var(--green);';
     const balStr=bal>0?`Owes ₹${bal.toLocaleString('en-IN')}`:(bal<0?`Overpaid ₹${Math.abs(bal).toLocaleString('en-IN')}`:'✓ Settled');
+    const isOrg=m.userId===currentUser.id;
     return `<tr>
-      <td><div style="display:flex;align-items:center;gap:6px;"><div class="mem-av">${initials(m.name)}</div>${m.name}</div></td>
+      <td><div style="display:flex;align-items:center;gap:6px;">
+        <div class="mem-av" style="${isOrg?'background:linear-gradient(135deg,#f97316,#ea580c);':''}">${initials(m.name)}</div>
+        ${m.name}${isOrg?' 👑':''}
+      </div></td>
       <td>₹${perHead.toLocaleString('en-IN')}</td>
-      <td><input class="adv-input" type="number" value="${adv}" min="0" inputmode="decimal" onchange="updateAdvance(${i},this.value)" oninput="updateAdvance(${i},this.value)"></td>
+      <td><input class="adv-input" type="number" value="${adv}" min="0" inputmode="decimal"
+        onchange="updateAdvance(${i},this.value)"
+        onfocus="this.select()"
+        style="width:90px;"></td>
       <td style="${balStyle}font-weight:800;font-size:0.82rem;">${balStr}</td>
     </tr>`;
   }).join('');
@@ -1522,7 +1710,8 @@ function renderNotesList(notes,cid){
     </div>`).join('');
 }
 async function orgDeleteTrip(tid){
-  if(!confirm('Delete this trip?'))return;
+  const ok=await showConfirm('This will permanently delete the trip and all its expenses and notes.','Delete Trip?','Delete','var(--red)');
+  if(!ok)return;
   const [expSnap,notesSnap]=await Promise.all([
     db.collection('expenses').where('tripId','==',tid).get(),
     db.collection('notes').where('tripId','==',tid).get()
@@ -1553,28 +1742,49 @@ async function openModal(id){
     const travs=d.users.filter(u=>u.role==='traveller'&&u.status==='active');
     const c=document.getElementById('nt-travellers-available');
     selectedTravellers=[];
-    if(!travs.length){c.innerHTML=`<span style="font-size:0.8rem;color:var(--muted);font-weight:600;">No approved travellers yet. Share invite link!</span>`;}
-    else{c.innerHTML=travs.map(t=>`
+    // Pre-select organiser as first traveller
+    const orgEntry={userId:currentUser.id,name:orgFullName(),advance:0};
+    selectedTravellers.push(orgEntry);
+    const orgDiv=`
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--blue-light);border:1.5px solid var(--blue);border-radius:10px;margin-bottom:6px;opacity:0.85;">
+        <div class="mem-av" style="margin-right:0;background:linear-gradient(135deg,#f97316,#ea580c);">${initials(currentUser.firstName)}</div>
+        <div><div style="font-size:0.88rem;font-weight:800;">${orgFullName()} (You — Organiser)</div></div>
+        <span style="font-size:0.75rem;font-weight:700;color:var(--blue);margin-left:auto;">Always included</span>
+      </div>`;
+    if(!travs.length){c.innerHTML=orgDiv+`<span style="font-size:0.8rem;color:var(--muted);font-weight:600;display:block;margin-top:8px;">No approved travellers yet. Share invite link!</span>`;}
+    else{c.innerHTML=orgDiv+travs.map(t=>`
       <div id="tsel-${t.id}" onclick="toggleTravellerSel('${t.id}','${t.firstName} ${t.lastName||''}')"
         style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--light);border:1.5px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px;transition:all 0.2s;">
         <div class="mem-av" style="margin-right:0;">${initials(t.firstName)}</div>
         <div><div style="font-size:0.88rem;font-weight:700;">${t.firstName} ${t.lastName||''}</div>
         <div style="font-size:0.72rem;color:var(--muted);">${t.username}</div></div>
+        <span style="font-size:1rem;margin-left:auto;">⭕</span>
       </div>`).join('');}
     document.getElementById('nt-start').value=new Date().toISOString().split('T')[0];
   }
   document.getElementById(id).classList.add('open');
 }
 function closeModal(id){document.getElementById(id).classList.remove('open');}
-function toggleTravellerSel(uid,name){
-  const el=document.getElementById('tsel-'+uid);
-  const idx=selectedTravellers.findIndex(t=>t.userId===uid);
-  if(idx>-1){selectedTravellers.splice(idx,1);el.style.background='';el.style.borderColor='';}
-  else{selectedTravellers.push({userId:uid,name,advance:0});el.style.background='var(--blue-light)';el.style.borderColor='var(--blue)';}
+function toggleTravellerSel(tUid,name){
+  const el=document.getElementById('tsel-'+tUid);
+  const idx=selectedTravellers.findIndex(t=>t.userId===tUid);
+  if(idx>-1){
+    selectedTravellers.splice(idx,1);
+    el.style.background='var(--light)';el.style.borderColor='var(--border)';
+    el.querySelector('span:last-child').textContent='⭕';
+  }else{
+    selectedTravellers.push({userId:tUid,name,advance:0});
+    el.style.background='var(--blue-light)';el.style.borderColor='var(--blue)';
+    el.querySelector('span:last-child').textContent='✅';
+  }
 }
 async function saveNewTrip(){
   const name=document.getElementById('nt-name').value.trim();
   if(!name){toast('Enter trip name!','#dc2626');return;}
+  // Ensure organiser is always included
+  if(!selectedTravellers.find(m=>m.userId===currentUser.id)){
+    selectedTravellers.unshift({userId:currentUser.id,name:orgFullName(),advance:0});
+  }
   const docId=uid();
   const trip={
     id:docId,name,
@@ -1596,12 +1806,13 @@ async function saveNewTrip(){
 async function openAddExpModal(){
   const snap=await db.collection('trips').doc(activeTripId).get();
   const trip=snap.data();if(!trip)return;
-  const pb=document.getElementById('ae-paidby');
   const travellers=trip.travellers||[];
-  pb.innerHTML='<option value="">-- Select --</option>'+travellers.map(m=>`<option>${m.name}</option>`).join('');
+  const pb=document.getElementById('ae-paidby');
+  // Build paid-by options with organiser pre-selected (fix #7)
+  pb.innerHTML=travellers.map(m=>`<option value="${m.name}" ${m.userId===currentUser.id?'selected':''}>${m.name}${m.userId===currentUser.id?' (You)':''}</option>`).join('');
   document.getElementById('ae-split-checks').innerHTML=travellers.map(m=>`
     <label style="display:flex;align-items:center;gap:5px;background:var(--light);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:0.82rem;font-weight:700;font-family:var(--font);">
-      <input type="checkbox" value="${m.name}" style="accent-color:var(--blue);width:16px;height:16px;"> ${m.name}
+      <input type="checkbox" value="${m.name}" checked style="accent-color:var(--blue);width:16px;height:16px;"> ${m.name}${m.userId===currentUser.id?' 👑':''}
     </label>`).join('');
   document.getElementById('ae-date').value=trip.start||new Date().toISOString().split('T')[0];
   document.getElementById('modal-add-expense').classList.add('open');
@@ -1721,7 +1932,7 @@ async function saveNote(){
   closeModal('modal-add-note');
   document.getElementById('note-text').value='';
   toast('Note sent! 📨','#16a34a');
-  if(currentUser.role==='traveller') renderTrvDetail();
+  if(currentUser.role==='traveller')renderTrvDetail();
   else renderOrgDetail();
 }
 
@@ -1736,10 +1947,23 @@ async function generatePdf(tid){
   const travellers=trip.travellers||[];
   const perHead=travellers.length?Math.round(totalSpent/travellers.length):0;
   const {jsPDF}=window.jspdf;const doc=new jsPDF();const pg=doc.internal.pageSize;
+
+  // Fetch logo as base64 for PDF embedding
+  let logoBase64=null;
+  try{
+    const res=await fetch('https://raw.githubusercontent.com/travelmate8310/TravelMate/main/logo.png');
+    const blob=await res.blob();
+    logoBase64=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(blob);});
+  }catch(e){console.warn('Logo fetch failed, skipping in PDF');}
+
   let y=18;
   doc.setFillColor(59,130,246);doc.rect(0,0,pg.width,28,'F');
   doc.setTextColor(255,255,255);doc.setFontSize(17);doc.setFont('helvetica','bold');
   doc.text('TravelMate — Trip Report',14,17);
+  // Logo top-right in header
+  if(logoBase64){
+    try{doc.addImage(logoBase64,'PNG',pg.width-30,3,22,22);}catch(e){}
+  }
   y=38;doc.setTextColor(30,41,59);doc.setFontSize(13);doc.setFont('helvetica','bold');
   doc.text(trip.name,14,y);y+=7;
   doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(100,116,139);
@@ -1802,7 +2026,9 @@ async function generatePdf(tid){
 //  MODAL CLOSE ON OVERLAY CLICK
 // ═══════════════════════════════════════════
 document.querySelectorAll('.overlay').forEach(el=>{
-  el.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+  el.addEventListener('click',function(e){
+    if(e.target===this&&this.id!=='modal-confirm')this.classList.remove('open');
+  });
 });
 
 // ═══════════════════════════════════════════
@@ -1827,7 +2053,7 @@ window.addEventListener('appinstalled',()=>{
 });
 
 // ═══════════════════════════════════════════
-//  SERVICE WORKER REGISTER
+//  SERVICE WORKER
 // ═══════════════════════════════════════════
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
