@@ -1578,7 +1578,9 @@ async function renderOrgDetail(){
     </div>
   `;
   renderMemberTable(trip,perHead,d);
-  renderExpList(exps,'exp-list',true);
+  const orgTraveller=(trip.travellers||[]).find(m=>m.userId===trip.organiserId);
+  const orgNameForList=orgTraveller?orgTraveller.name:orgFullName();
+  renderExpList(exps,'exp-list',true,orgNameForList);
   renderNotesList(notes,'notes-list');
 }
 
@@ -1642,11 +1644,14 @@ async function saveEditedTravellers(){
   renderOrgDetail();
 }
 
-function calcPersonShares(travellers, exps){
-  // For each traveller, sum up their share of each expense based on splitAmong
+function calcPersonShares(travellers, exps, orgName){
+  // Only expenses paid by organiser affect share/advance
+  // Expenses paid by others are for record only — not adjusted in advance
   const shares={};
   travellers.forEach(m=>{ shares[m.name]=0; });
   exps.forEach(e=>{
+    // Skip if not paid by organiser
+    if(e.paidBy && e.paidBy !== orgName) return;
     const amount=+e.amount||0;
     const split=e.splitAmong&&e.splitAmong.length?e.splitAmong:travellers.map(m=>m.name);
     const portion=Math.round(amount/split.length);
@@ -1654,15 +1659,17 @@ function calcPersonShares(travellers, exps){
       if(shares.hasOwnProperty(name)) shares[name]+=portion;
     });
   });
-  return shares; // {name: shareAmount}
+  return shares;
 }
 
 function renderMemberTable(trip,perHead,d){
   const tbody=document.getElementById('mem-tbody');if(!tbody)return;
   const travellers=trip.travellers||[];
-  // Get expenses for this trip from d
   const exps=(d.expenses||[]).filter(e=>e.tripId===trip.id);
-  const shares=calcPersonShares(travellers,exps);
+  // Find organiser name from travellers list
+  const orgTraveller=travellers.find(m=>m.userId===trip.organiserId);
+  const orgName=orgTraveller?orgTraveller.name:orgFullName();
+  const shares=calcPersonShares(travellers,exps,orgName);
   tbody.innerHTML=travellers.map((m,i)=>{
     const adv=+m.advance||0;
     const myShare=shares[m.name]||0;
@@ -1693,24 +1700,29 @@ async function updateAdvance(idx,val){
   const d=await getAllData();
   renderMemberTable(trip,0,d);
 }
-function renderExpList(exps,cid,canDelete){
+function renderExpList(exps,cid,canDelete,orgName){
   const el=document.getElementById(cid);if(!el)return;
   if(!exps.length){el.innerHTML=`<div class="empty-state" style="padding:20px 0;"><span class="ei" style="font-size:2rem;">🧾</span><p>No expenses yet.</p></div>`;return;}
-  el.innerHTML=exps.slice().reverse().map(e=>`
-    <div class="exp-item" style="flex-wrap:wrap;">
+  el.innerHTML=exps.slice().reverse().map(e=>{
+    const isRecordOnly=orgName&&e.paidBy&&e.paidBy!==orgName;
+    return `
+    <div class="exp-item" style="flex-wrap:wrap;${isRecordOnly?'opacity:0.85;border-left:3px solid var(--orange);':''}">
       <div class="exp-icon" style="background:${catBg(e.cat)}">${catIcon(e.cat)}</div>
       <div class="exp-body" style="flex:1;min-width:0;">
-        <div class="exp-cat">${catLabel(e.cat)}</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <div class="exp-cat">${catLabel(e.cat)}</div>
+          ${isRecordOnly?`<span style="font-size:0.65rem;font-weight:800;background:rgba(249,115,22,0.12);color:var(--orange);padding:2px 7px;border-radius:20px;border:1px solid rgba(249,115,22,0.3);">📋 Record Only</span>`:''}
+        </div>
         <div class="exp-note">${e.note||'—'}</div>
         ${e.paidBy?`<div class="exp-sub">💳 Paid by: <strong>${e.paidBy}</strong></div>`:''}
-        ${e.splitAmong&&e.splitAmong.length?`<div class="exp-sub">👥 Split: ${e.splitAmong.join(', ')}</div>`:''}
+        ${e.splitAmong&&e.splitAmong.length?`<div class="exp-sub">👥 Involves: ${e.splitAmong.join(', ')}</div>`:''}
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
         ${e.date?`<div style="font-size:0.7rem;color:var(--muted);font-weight:600;white-space:nowrap;">${fmtShort(e.date)}</div>`:''}
         <div class="exp-amt">₹${(+e.amount).toLocaleString('en-IN')}</div>
         ${canDelete?`<button class="btn btn-ghost btn-xs" style="color:var(--red);border-color:var(--red);" onclick="deleteExpense('${e.id}')">✕ Remove</button>`:''}
       </div>
-    </div>`).join('');
+    </div>`}).join('');
 }
 function renderNotesList(notes,cid){
   const el=document.getElementById(cid);if(!el)return;
@@ -1821,40 +1833,34 @@ async function openAddExpModal(){
   const travellers=trip.travellers||[];
   const pb=document.getElementById('ae-paidby');
   pb.innerHTML=travellers.map(m=>`<option value="${m.name}" ${m.userId===currentUser.id?'selected':''}>${m.name}${m.userId===currentUser.id?' (You)':''}</option>`).join('');
-  // Render split toggles
+
   function renderSplitToggles(selectedPaidBy){
     const isOrg=travellers.find(m=>m.name===selectedPaidBy)?.userId===currentUser.id;
+    // All selected by default always — organiser can change selection freely
     document.getElementById('ae-split-checks').innerHTML=travellers.map(m=>{
-      // If paidBy is organiser → all selected by default
-      // If paidBy is someone else → only that person selected, others locked off
-      const shouldSelect=isOrg?true:m.name===selectedPaidBy;
-      const locked=!isOrg&&m.name!==selectedPaidBy;
-      return `<div id="split-${m.userId}"
-        onclick="${locked?'':'toggleSplit(this,\''+m.name+'\')'}"
+      return `<div id="split-${m.userId}" onclick="toggleSplit(this,'${m.name}')"
         style="display:flex;align-items:center;gap:8px;
-          background:${shouldSelect?'var(--blue-light)':'var(--light)'};
-          border:2px solid ${shouldSelect?'var(--blue)':'var(--border)'};
-          border-radius:8px;padding:8px 12px;
-          cursor:${locked?'not-allowed':'pointer'};
-          opacity:${locked?'0.45':'1'};
+          background:var(--blue-light);border:2px solid var(--blue);
+          border-radius:8px;padding:8px 12px;cursor:pointer;
           font-size:0.85rem;font-weight:700;font-family:var(--font);user-select:none;transition:all 0.15s;"
-        data-selected="${shouldSelect}" data-name="${m.name}">
-        <span style="font-size:1rem;">${shouldSelect?'✅':'⭕'}</span>
+        data-selected="true" data-name="${m.name}">
+        <span style="font-size:1rem;">✅</span>
         <span>${m.name}${m.userId===currentUser.id?' 👑':''}</span>
-        ${locked?'<span style="font-size:0.7rem;color:var(--muted);margin-left:auto;">not split</span>':''}
       </div>`;
     }).join('');
-    // Show hint if non-organiser payer
+    // Show record-only notice if non-organiser is payer
     const hint=document.getElementById('split-hint');
     if(hint){
-      hint.style.display=isOrg?'none':'block';
-      hint.textContent=`ℹ️ Expense paid by ${selectedPaidBy} — only recorded for them, not split among others.`;
+      if(!isOrg){
+        hint.style.display='block';
+        hint.innerHTML=`📋 <strong>Record only</strong> — Expense paid by <strong>${selectedPaidBy}</strong> will be recorded but will <strong>not</strong> affect anyone's share or advance amount.`;
+      } else {
+        hint.style.display='none';
+      }
     }
   }
-  // Initial render
-  const orgName=orgFullName();
-  renderSplitToggles(orgName);
-  // Update splits when paidBy changes
+
+  renderSplitToggles(orgFullName());
   pb.onchange=function(){ renderSplitToggles(this.value); };
   document.getElementById('ae-date').value=trip.start||new Date().toISOString().split('T')[0];
   document.getElementById('modal-add-expense').classList.add('open');
@@ -1910,7 +1916,10 @@ async function renderTrvTrips(){
     const spent=exps.reduce((s,e)=>s+(+e.amount||0),0);
     const travellers=t.travellers||[];
     const me=travellers.find(m=>m.userId===currentUser.id);
-    const shares=calcPersonShares(travellers,exps);
+    // Get organiser name for correct share calculation
+    const orgT=travellers.find(m=>m.userId===t.organiserId);
+    const orgN=orgT?orgT.name:'';
+    const shares=calcPersonShares(travellers,exps,orgN);
     const myShare=me?shares[me.name]||0:0;
     return `<div class="trip-card-item" onclick="openTrvDetail('${t.id}')">
       <div class="tc-name">${t.name}</div>
@@ -1940,8 +1949,10 @@ async function renderTrvDetail(){
   const travellers=trip.travellers||[];
   const me=travellers.find(m=>m.userId===currentUser.id);
   const adv=me?+me.advance||0:0;
-  // Calculate my share based on splitAmong per expense
-  const shares=calcPersonShares(travellers,exps);
+  // Calculate my share — only expenses paid by organiser count toward advance
+  const orgTraveller=travellers.find(m=>m.userId===trip.organiserId);
+  const orgName=orgTraveller?orgTraveller.name:'';
+  const shares=calcPersonShares(travellers,exps,orgName);
   const myShare=me?shares[me.name]||0:0;
   const bal=myShare-adv;
   document.getElementById('trv-detail-view').innerHTML=`
@@ -1971,7 +1982,9 @@ async function renderTrvDetail(){
       <div id="trv-notes-list" style="margin-top:10px;"></div>
     </div>
   `;
-  renderExpList(exps,'trv-exp-list',false);
+  const trvOrgTraveller=travellers.find(m=>m.userId===trip.organiserId);
+  const trvOrgName=trvOrgTraveller?trvOrgTraveller.name:'';
+  renderExpList(exps,'trv-exp-list',false,trvOrgName);
   const myNotes=d.notes.filter(n=>n.tripId===activeTripId&&n.byId===currentUser.id);
   renderNotesList(myNotes,'trv-notes-list');
 }
@@ -2009,7 +2022,9 @@ async function generatePdf(tid){
   const catBgMap={hotel:'#ede9fe',fuel:'#dcfce7',food:'#fff7ed',transport:'#dbeafe',entry:'#fce7f3',shopping:'#fef9c3',misc:'#f1f5f9'};
   const catColMap={hotel:'#7c3aed',fuel:'#16a34a',food:'#ea580c',transport:'#2563eb',entry:'#db2777',shopping:'#ca8a04',misc:'#475569'};
 
-  const shares=calcPersonShares(travellers,exps);
+  const orgTraveller=travellers.find(m=>m.userId===trip.organiserId);
+  const orgName=orgTraveller?orgTraveller.name:'';
+  const shares=calcPersonShares(travellers,exps,orgName);
   const travellerRows=travellers.map(m=>{
     const adv=+m.advance||0;
     const myShare=shares[m.name]||0;
