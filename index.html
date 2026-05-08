@@ -1674,16 +1674,19 @@ function renderExpList(exps,cid,canDelete){
   const el=document.getElementById(cid);if(!el)return;
   if(!exps.length){el.innerHTML=`<div class="empty-state" style="padding:20px 0;"><span class="ei" style="font-size:2rem;">🧾</span><p>No expenses yet.</p></div>`;return;}
   el.innerHTML=exps.slice().reverse().map(e=>`
-    <div class="exp-item">
+    <div class="exp-item" style="flex-wrap:wrap;">
       <div class="exp-icon" style="background:${catBg(e.cat)}">${catIcon(e.cat)}</div>
-      <div class="exp-body">
+      <div class="exp-body" style="flex:1;min-width:0;">
         <div class="exp-cat">${catLabel(e.cat)}</div>
         <div class="exp-note">${e.note||'—'}</div>
-        ${e.paidBy?`<div class="exp-sub">Paid by: ${e.paidBy}</div>`:''}
+        ${e.paidBy?`<div class="exp-sub">💳 Paid by: <strong>${e.paidBy}</strong></div>`:''}
+        ${e.splitAmong&&e.splitAmong.length?`<div class="exp-sub">👥 Split: ${e.splitAmong.join(', ')}</div>`:''}
       </div>
-      ${e.date?`<div style="font-size:0.7rem;color:var(--muted);font-weight:600;white-space:nowrap;">${fmtShort(e.date)}</div>`:''}
-      <div class="exp-amt">₹${(+e.amount).toLocaleString('en-IN')}</div>
-      ${canDelete?`<button class="btn btn-ghost btn-xs" style="color:var(--red);border-color:var(--red);flex-shrink:0;" onclick="deleteExpense('${e.id}')">✕</button>`:''}
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
+        ${e.date?`<div style="font-size:0.7rem;color:var(--muted);font-weight:600;white-space:nowrap;">${fmtShort(e.date)}</div>`:''}
+        <div class="exp-amt">₹${(+e.amount).toLocaleString('en-IN')}</div>
+        ${canDelete?`<button class="btn btn-ghost btn-xs" style="color:var(--red);border-color:var(--red);" onclick="deleteExpense('${e.id}')">✕ Remove</button>`:''}
+      </div>
     </div>`).join('');
 }
 function renderNotesList(notes,cid){
@@ -1939,85 +1942,182 @@ async function saveNote(){
 // ═══════════════════════════════════════════
 async function generatePdf(tid){
   const d=await getAllData();
-  const trip=d.trips.find(t=>t.id===tid);if(!trip){toast('Trip not found.','#dc2626');return;}
+  const trip=d.trips.find(t=>t.id===tid);
+  if(!trip){toast('Trip not found.','#dc2626');return;}
   const exps=d.expenses.filter(e=>e.tripId===tid);
   const totalSpent=exps.reduce((s,e)=>s+(+e.amount||0),0);
   const travellers=trip.travellers||[];
   const perHead=travellers.length?Math.round(totalSpent/travellers.length):0;
-  const {jsPDF}=window.jspdf;const doc=new jsPDF();const pg=doc.internal.pageSize;
+  const LOGO='https://raw.githubusercontent.com/travelmate8310/TravelMate/main/logo.png';
 
-  // Fetch logo as base64 for PDF embedding
-  let logoBase64=null;
-  try{
-    const res=await fetch('https://raw.githubusercontent.com/travelmate8310/TravelMate/main/logo.png');
-    const blob=await res.blob();
-    logoBase64=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(blob);});
-  }catch(e){console.warn('Logo fetch failed, skipping in PDF');}
+  // Category colours matching the app
+  const catBgMap={hotel:'#ede9fe',fuel:'#dcfce7',food:'#fff7ed',transport:'#dbeafe',entry:'#fce7f3',shopping:'#fef9c3',misc:'#f1f5f9'};
+  const catColMap={hotel:'#7c3aed',fuel:'#16a34a',food:'#ea580c',transport:'#2563eb',entry:'#db2777',shopping:'#ca8a04',misc:'#475569'};
 
-  let y=18;
-  doc.setFillColor(59,130,246);doc.rect(0,0,pg.width,28,'F');
-  doc.setTextColor(255,255,255);doc.setFontSize(17);doc.setFont('helvetica','bold');
-  doc.text('TravelMate — Trip Report',14,17);
-  // Logo top-right in header
-  if(logoBase64){
-    try{doc.addImage(logoBase64,'PNG',pg.width-30,3,22,22);}catch(e){}
+  const travellerRows=travellers.map(m=>{
+    const adv=+m.advance||0,bal=perHead-adv;
+    const balStr=bal>0?`Owes ₹${bal.toLocaleString('en-IN')}`:(bal<0?`Overpaid ₹${Math.abs(bal).toLocaleString('en-IN')}`:'✓ Settled');
+    const balCol=bal>0?'#ef4444':(bal<0?'#f97316':'#16a34a');
+    return `<tr>
+      <td>${m.name}</td>
+      <td>₹${perHead.toLocaleString('en-IN')}</td>
+      <td>₹${adv.toLocaleString('en-IN')}</td>
+      <td style="color:${balCol};font-weight:800;">${balStr}</td>
+    </tr>`;
+  }).join('');
+
+  const expenseRows=exps.slice().reverse().map((e,i)=>{
+    const bg=catBgMap[e.cat]||'#f1f5f9';
+    const col=catColMap[e.cat]||'#475569';
+    return `<tr>
+      <td>${i+1}</td>
+      <td><span style="display:inline-flex;align-items:center;gap:6px;background:${bg};color:${col};padding:3px 10px;border-radius:20px;font-weight:700;font-size:0.78rem;">${catIcon(e.cat)} ${catLabel(e.cat)}</span></td>
+      <td>${e.note||'—'}</td>
+      <td style="white-space:nowrap;">${e.date?fmt(e.date):'—'}</td>
+      <td>${e.paidBy||'—'}</td>
+      <td>${e.splitAmong&&e.splitAmong.length?e.splitAmong.join(', '):'All'}</td>
+      <td style="font-weight:800;color:#1e293b;white-space:nowrap;">₹${(+e.amount).toLocaleString('en-IN')}</td>
+    </tr>`;
+  }).join('');
+
+  // Category breakdown
+  const catTotals={};
+  exps.forEach(e=>{catTotals[e.cat]=(catTotals[e.cat]||0)+(+e.amount||0);});
+  const catRows=Object.entries(catTotals).map(([c,v])=>{
+    const bg=catBgMap[c]||'#f1f5f9';
+    const col=catColMap[c]||'#475569';
+    return `<tr>
+      <td><span style="display:inline-flex;align-items:center;gap:6px;background:${bg};color:${col};padding:3px 10px;border-radius:20px;font-weight:700;font-size:0.78rem;">${catIcon(c)} ${catLabel(c)}</span></td>
+      <td style="font-weight:800;">₹${v.toLocaleString('en-IN')}</td>
+      <td>${Math.round(v/totalSpent*100)}%</td>
+      <td style="width:120px;">
+        <div style="background:#e2e8f0;border-radius:4px;height:8px;">
+          <div style="background:#3b82f6;border-radius:4px;height:8px;width:${Math.round(v/totalSpent*100)}%;"></div>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const html=`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>TravelMate — ${trip.name}</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Pacifico&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Nunito',sans-serif;color:#1e293b;background:#fff;font-size:13px;padding:0;}
+  @media print{
+    body{padding:0;}
+    .no-print{display:none!important;}
+    @page{margin:15mm;size:A4;}
   }
-  y=38;doc.setTextColor(30,41,59);doc.setFontSize(13);doc.setFont('helvetica','bold');
-  doc.text(trip.name,14,y);y+=7;
-  doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(100,116,139);
-  if(trip.start)doc.text(`Dates: ${fmt(trip.start)} → ${fmt(trip.end)}`,14,y);
-  doc.text(`Days: ${trip.days} / Nights: ${trip.nights}`,110,y);y+=5;
-  doc.text(`Travellers: ${travellers.length}`,14,y);
-  if(trip.budget)doc.text(`Budget: Rs ${Number(trip.budget).toLocaleString('en-IN')}`,110,y);y+=10;
-  doc.setFillColor(239,246,255);
-  doc.roundedRect(14,y,55,16,3,3,'F');doc.roundedRect(74,y,55,16,3,3,'F');doc.roundedRect(134,y,55,16,3,3,'F');
-  doc.setTextColor(59,130,246);doc.setFontSize(8);doc.setFont('helvetica','bold');
-  doc.text('Total Spent',16,y+5);doc.text('Per Person',76,y+5);doc.text('Transactions',136,y+5);
-  doc.setTextColor(30,41,59);doc.setFontSize(10);
-  doc.text(`Rs ${totalSpent.toLocaleString('en-IN')}`,16,y+12);
-  doc.text(`Rs ${perHead.toLocaleString('en-IN')}`,76,y+12);
-  doc.text(`${exps.length}`,136,y+12);y+=22;
-  doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(30,41,59);
-  doc.text('Travellers & Balance',14,y);y+=3;
-  doc.autoTable({startY:y,
-    head:[['Name','Share (Rs)','Advance (Rs)','Balance']],
-    body:travellers.map(m=>{const adv=+m.advance||0,bal=perHead-adv;
-      return[m.name,`Rs ${perHead.toLocaleString('en-IN')}`,`Rs ${adv.toLocaleString('en-IN')}`,
-        bal>0?`Owes Rs ${bal.toLocaleString('en-IN')}`:(bal<0?`Overpaid Rs ${Math.abs(bal).toLocaleString('en-IN')}`:'Settled')];
-    }),
-    styles:{fontSize:8,cellPadding:3,font:'helvetica'},
-    headStyles:{fillColor:[59,130,246],textColor:255,fontStyle:'bold'},
-    alternateRowStyles:{fillColor:[239,246,255]},margin:{left:14,right:14}
-  });y=doc.lastAutoTable.finalY+8;
-  doc.setFontSize(10);doc.setFont('helvetica','bold');doc.text('Expense Details',14,y);y+=3;
-  doc.autoTable({startY:y,
-    head:[['#','Category','Description','Date','Paid By','Amount (Rs)']],
-    body:exps.map((e,i)=>[i+1,catLabel(e.cat),e.note||'—',e.date||'—',e.paidBy||'—',`Rs ${(+e.amount).toLocaleString('en-IN')}`]),
-    foot:[['','','','','Total',`Rs ${totalSpent.toLocaleString('en-IN')}`]],
-    styles:{fontSize:8,cellPadding:3,font:'helvetica'},
-    headStyles:{fillColor:[249,115,22],textColor:255,fontStyle:'bold'},
-    footStyles:{fillColor:[255,247,237],textColor:[30,41,59],fontStyle:'bold'},
-    alternateRowStyles:{fillColor:[255,247,237]},margin:{left:14,right:14}
-  });
-  const catTotals={};exps.forEach(e=>{catTotals[e.cat]=(catTotals[e.cat]||0)+(+e.amount||0);});
-  if(Object.keys(catTotals).length){
-    y=doc.lastAutoTable.finalY+8;
-    doc.setFontSize(10);doc.setFont('helvetica','bold');doc.text('Category Breakdown',14,y);y+=3;
-    doc.autoTable({startY:y,
-      head:[['Category','Amount (Rs)','% of Total']],
-      body:Object.entries(catTotals).map(([c,v])=>[catLabel(c),`Rs ${v.toLocaleString('en-IN')}`,`${Math.round(v/totalSpent*100)}%`]),
-      styles:{fontSize:8,cellPadding:3,font:'helvetica'},
-      headStyles:{fillColor:[236,72,153],textColor:255,fontStyle:'bold'},
-      alternateRowStyles:{fillColor:[253,242,248]},margin:{left:14,right:14}
-    });
-  }
-  const totalPages=doc.getNumberOfPages();
-  for(let i=1;i<=totalPages;i++){
-    doc.setPage(i);doc.setFontSize(7);doc.setTextColor(148,163,184);
-    doc.text(`TravelMate · Generated ${new Date().toLocaleString('en-IN')} · Page ${i}/${totalPages}`,14,doc.internal.pageSize.height-7);
-  }
-  doc.save(`TravelMate_${trip.name.replace(/\s+/g,'_')}.pdf`);
-  toast('PDF downloaded! 📄','#16a34a');
+  /* ── Header ── */
+  .header{background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;border-radius:0 0 16px 16px;margin-bottom:20px;}
+  .header-left h1{font-family:'Pacifico',cursive;font-size:1.8rem;letter-spacing:0.5px;}
+  .header-left p{font-size:0.78rem;opacity:0.85;margin-top:2px;font-weight:600;}
+  .header-right img{width:52px;height:52px;border-radius:10px;border:2px solid rgba(255,255,255,0.4);}
+  /* ── Trip Title ── */
+  .trip-title{padding:0 24px;margin-bottom:16px;}
+  .trip-title h2{font-family:'Pacifico',cursive;font-size:1.4rem;color:#1e293b;margin-bottom:6px;}
+  .trip-meta{display:flex;gap:12px;flex-wrap:wrap;font-size:0.8rem;color:#64748b;font-weight:600;}
+  /* ── Stats row ── */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:0 24px;margin-bottom:20px;}
+  .stat{background:linear-gradient(135deg,#f0f6ff,#e8f4ff);border:1.5px solid #bfdbfe;border-radius:12px;padding:12px 14px;text-align:center;}
+  .stat .val{font-size:1.3rem;font-weight:900;color:#1d4ed8;}
+  .stat .lbl{font-size:0.68rem;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:0.6px;margin-top:2px;}
+  /* ── Section ── */
+  .section{padding:0 24px;margin-bottom:20px;}
+  .section-title{font-size:0.85rem;font-weight:900;color:#1e293b;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;gap:6px;}
+  /* ── Tables ── */
+  table{width:100%;border-collapse:collapse;font-size:0.82rem;}
+  th{background:#1e293b;color:#fff;padding:8px 10px;text-align:left;font-weight:800;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;}
+  td{padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  tr:nth-child(even) td{background:#f8fafc;}
+  .tfoot td{background:#1e293b!important;color:#fff;font-weight:800;border:none;}
+  /* ── Print button ── */
+  .print-bar{background:#f0f6ff;border:1.5px solid #bfdbfe;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+  .print-bar p{font-size:0.8rem;color:#64748b;font-weight:600;}
+  .print-btn{background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;border:none;border-radius:10px;padding:10px 24px;font-family:'Nunito',sans-serif;font-weight:800;font-size:0.9rem;cursor:pointer;}
+  /* ── Footer ── */
+  .footer{text-align:center;font-size:0.7rem;color:#94a3b8;font-weight:600;padding:16px 24px 24px;border-top:1px solid #e2e8f0;margin-top:20px;}
+</style>
+</head>
+<body>
+
+<div class="print-bar no-print">
+  <p>📄 Ready to save as PDF — Click Print and choose "Save as PDF"</p>
+  <button class="print-btn" onclick="window.print()">🖨 Print / Save PDF</button>
+</div>
+
+<div class="header">
+  <div class="header-left">
+    <h1>TravelMate</h1>
+    <p>Trip Expense Report · Generated ${new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}</p>
+  </div>
+  <div class="header-right">
+    <img src="${LOGO}" alt="TravelMate Logo" onerror="this.style.display='none'">
+  </div>
+</div>
+
+<div class="trip-title">
+  <h2>${trip.name}</h2>
+  <div class="trip-meta">
+    ${trip.start?`<span>📅 ${fmt(trip.start)} → ${fmt(trip.end)}</span>`:''}
+    <span>☀️ ${trip.days} Days / 🌙 ${trip.nights} Nights</span>
+    <span>👥 ${travellers.length} Travellers</span>
+    ${trip.budget?`<span>💰 Budget: ₹${Number(trip.budget).toLocaleString('en-IN')}</span>`:''}
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="val">₹${totalSpent.toLocaleString('en-IN')}</div><div class="lbl">Total Spent</div></div>
+  <div class="stat"><div class="val">₹${perHead.toLocaleString('en-IN')}</div><div class="lbl">Per Person</div></div>
+  <div class="stat"><div class="val">${exps.length}</div><div class="lbl">Transactions</div></div>
+</div>
+
+<div class="section">
+  <div class="section-title">👥 Travellers & Balance</div>
+  <table>
+    <thead><tr><th>Name</th><th>Share</th><th>Advance</th><th>Balance</th></tr></thead>
+    <tbody>${travellerRows}</tbody>
+  </table>
+</div>
+
+<div class="section">
+  <div class="section-title">💸 Expense Details</div>
+  <table>
+    <thead><tr><th>#</th><th>Category</th><th>Description</th><th>Date</th><th>Paid By</th><th>Split Among</th><th>Amount</th></tr></thead>
+    <tbody>${expenseRows}</tbody>
+    <tfoot><tr class="tfoot"><td colspan="6" style="text-align:right;padding-right:12px;">Total</td><td>₹${totalSpent.toLocaleString('en-IN')}</td></tr></tfoot>
+  </table>
+</div>
+
+${Object.keys(catTotals).length?`
+<div class="section">
+  <div class="section-title">📊 Category Breakdown</div>
+  <table>
+    <thead><tr><th>Category</th><th>Amount</th><th>%</th><th>Bar</th></tr></thead>
+    <tbody>${catRows}</tbody>
+  </table>
+</div>`:''}
+
+<div class="footer">
+  TravelMate · Trip Report for "${trip.name}" · ${new Date().toLocaleString('en-IN')}
+</div>
+
+</body>
+</html>`;
+
+  // Open in new tab — user prints/saves as PDF with full font+emoji support
+  const win=window.open('','_blank');
+  if(!win){toast('Allow pop-ups to generate PDF!','#dc2626');return;}
+  win.document.write(html);
+  win.document.close();
+  // Auto-trigger print dialog after fonts load
+  win.onload=()=>{ setTimeout(()=>win.print(),800); };
+  toast('PDF report opened! Choose "Save as PDF" 📄','#16a34a');
 }
 
 // ═══════════════════════════════════════════
