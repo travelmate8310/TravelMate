@@ -945,8 +945,9 @@ table.dtbl tr:hover td{background:var(--blue-light);}
     <div class="form-row"><label>Paid By</label>
       <select id="ae-paidby"><option value="">-- Select --</option></select></div>
     <div class="form-row">
-      <label>Split Among (blank = all)</label>
+      <label>Split Among</label>
       <div id="ae-split-checks" style="display:flex;flex-wrap:wrap;gap:7px;margin-top:6px;"></div>
+      <div id="split-hint" style="display:none;font-size:0.75rem;font-weight:700;color:var(--orange);margin-top:8px;padding:8px 10px;background:rgba(249,115,22,0.08);border-radius:8px;border:1px solid rgba(249,115,22,0.2);font-family:var(--font);"></div>
     </div>
     <button class="btn btn-orange btn-full" onclick="saveExpense()">Add Expense 💳</button>
   </div>
@@ -1454,10 +1455,16 @@ async function activateUser(id){
 async function deleteUser(id,name){
   const ok=await showConfirm(`Permanently delete "${name}"? This cannot be undone.`,'Delete User?','Delete','var(--red)');
   if(!ok)return;
-  // Use update to mark as deleted — avoids Firestore permission deny on .delete()
-  await db.collection('users').doc(id).update({status:'deleted',deletedAt:new Date().toISOString()});
-  toast(`${name} deleted.`,'#dc2626');
-  await renderAdminStats();adminTab('users');
+  try{
+    await db.collection('users').doc(id).delete();
+    toast(`${name} deleted.`,'#dc2626');
+    await renderAdminStats();adminTab('users');
+  }catch(e){
+    // Fallback to soft delete if hard delete is blocked by rules
+    await db.collection('users').doc(id).update({status:'deleted',deletedAt:new Date().toISOString()});
+    toast(`${name} removed.`,'#dc2626');
+    await renderAdminStats();adminTab('users');
+  }
 }
 async function adminDeleteTrip(tid){
   const ok=await showConfirm('This will permanently delete the trip and all its expenses.','Delete Trip?','Delete','var(--red)');
@@ -1813,15 +1820,42 @@ async function openAddExpModal(){
   const trip=snap.data();if(!trip)return;
   const travellers=trip.travellers||[];
   const pb=document.getElementById('ae-paidby');
-  // Build paid-by options with organiser pre-selected (fix #7)
   pb.innerHTML=travellers.map(m=>`<option value="${m.name}" ${m.userId===currentUser.id?'selected':''}>${m.name}${m.userId===currentUser.id?' (You)':''}</option>`).join('');
-  document.getElementById('ae-split-checks').innerHTML=travellers.map(m=>`
-    <div id="split-${m.userId}" onclick="toggleSplit(this,'${m.name}')"
-      style="display:flex;align-items:center;gap:8px;background:var(--blue-light);border:2px solid var(--blue);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:0.85rem;font-weight:700;font-family:var(--font);user-select:none;transition:all 0.15s;"
-      data-selected="true" data-name="${m.name}">
-      <span style="font-size:1rem;">✅</span>
-      <span>${m.name}${m.userId===currentUser.id?' 👑':''}</span>
-    </div>`).join('');
+  // Render split toggles
+  function renderSplitToggles(selectedPaidBy){
+    const isOrg=travellers.find(m=>m.name===selectedPaidBy)?.userId===currentUser.id;
+    document.getElementById('ae-split-checks').innerHTML=travellers.map(m=>{
+      // If paidBy is organiser → all selected by default
+      // If paidBy is someone else → only that person selected, others locked off
+      const shouldSelect=isOrg?true:m.name===selectedPaidBy;
+      const locked=!isOrg&&m.name!==selectedPaidBy;
+      return `<div id="split-${m.userId}"
+        onclick="${locked?'':'toggleSplit(this,\''+m.name+'\')'}"
+        style="display:flex;align-items:center;gap:8px;
+          background:${shouldSelect?'var(--blue-light)':'var(--light)'};
+          border:2px solid ${shouldSelect?'var(--blue)':'var(--border)'};
+          border-radius:8px;padding:8px 12px;
+          cursor:${locked?'not-allowed':'pointer'};
+          opacity:${locked?'0.45':'1'};
+          font-size:0.85rem;font-weight:700;font-family:var(--font);user-select:none;transition:all 0.15s;"
+        data-selected="${shouldSelect}" data-name="${m.name}">
+        <span style="font-size:1rem;">${shouldSelect?'✅':'⭕'}</span>
+        <span>${m.name}${m.userId===currentUser.id?' 👑':''}</span>
+        ${locked?'<span style="font-size:0.7rem;color:var(--muted);margin-left:auto;">not split</span>':''}
+      </div>`;
+    }).join('');
+    // Show hint if non-organiser payer
+    const hint=document.getElementById('split-hint');
+    if(hint){
+      hint.style.display=isOrg?'none':'block';
+      hint.textContent=`ℹ️ Expense paid by ${selectedPaidBy} — only recorded for them, not split among others.`;
+    }
+  }
+  // Initial render
+  const orgName=orgFullName();
+  renderSplitToggles(orgName);
+  // Update splits when paidBy changes
+  pb.onchange=function(){ renderSplitToggles(this.value); };
   document.getElementById('ae-date').value=trip.start||new Date().toISOString().split('T')[0];
   document.getElementById('modal-add-expense').classList.add('open');
 }
