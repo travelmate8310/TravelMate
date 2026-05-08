@@ -1580,7 +1580,7 @@ async function openEditTravellers(){
   const d=await getAllData();
   const trip=d.trips.find(t=>t.id===activeTripId);if(!trip)return;
   const currentTravellers=trip.travellers||[];
-  const allTravellers=d.users.filter(u=>u.role==='traveller'&&u.status==='active');
+  const allTravellers=d.users.filter(u=>u.role==='traveller'&&u.status==='active'&&u.invitedBy===currentUser.id);
   // Organiser is always first and cannot be removed
   const orgEntry={userId:currentUser.id,name:orgFullName(),advance:0,isOrg:true};
   const orgInTrip=currentTravellers.find(m=>m.userId===currentUser.id);
@@ -1607,7 +1607,7 @@ async function openEditTravellers(){
         <span style="font-size:1rem;">${isSelected?'✅':'⭕'}</span>
       </div>`;
     }).join('')}
-    ${allTravellers.length===0?`<p style="font-size:0.85rem;color:var(--muted);font-weight:600;text-align:center;padding:16px 0;">No approved travellers found. Share your invite link!</p>`:''}
+    ${allTravellers.length===0?`<div style="font-size:0.85rem;color:var(--muted);font-weight:600;text-align:center;padding:16px;background:var(--light);border-radius:10px;">No travellers have joined via your invite link yet.<br>Share your invite link to add members! 🔗</div>`:''}
   `;
   openModal('modal-edit-travellers');
 }
@@ -1635,11 +1635,31 @@ async function saveEditedTravellers(){
   renderOrgDetail();
 }
 
+function calcPersonShares(travellers, exps){
+  // For each traveller, sum up their share of each expense based on splitAmong
+  const shares={};
+  travellers.forEach(m=>{ shares[m.name]=0; });
+  exps.forEach(e=>{
+    const amount=+e.amount||0;
+    const split=e.splitAmong&&e.splitAmong.length?e.splitAmong:travellers.map(m=>m.name);
+    const portion=Math.round(amount/split.length);
+    split.forEach(name=>{
+      if(shares.hasOwnProperty(name)) shares[name]+=portion;
+    });
+  });
+  return shares; // {name: shareAmount}
+}
+
 function renderMemberTable(trip,perHead,d){
   const tbody=document.getElementById('mem-tbody');if(!tbody)return;
   const travellers=trip.travellers||[];
+  // Get expenses for this trip from d
+  const exps=(d.expenses||[]).filter(e=>e.tripId===trip.id);
+  const shares=calcPersonShares(travellers,exps);
   tbody.innerHTML=travellers.map((m,i)=>{
-    const adv=+m.advance||0,bal=perHead-adv;
+    const adv=+m.advance||0;
+    const myShare=shares[m.name]||0;
+    const bal=myShare-adv;
     const balStyle=bal>0?'color:var(--red);':'color:var(--green);';
     const balStr=bal>0?`Owes ₹${bal.toLocaleString('en-IN')}`:(bal<0?`Overpaid ₹${Math.abs(bal).toLocaleString('en-IN')}`:'✓ Settled');
     const isOrg=m.userId===currentUser.id;
@@ -1648,7 +1668,7 @@ function renderMemberTable(trip,perHead,d){
         <div class="mem-av" style="${isOrg?'background:linear-gradient(135deg,#f97316,#ea580c);':''}">${initials(m.name)}</div>
         ${m.name}${isOrg?' 👑':''}
       </div></td>
-      <td>₹${perHead.toLocaleString('en-IN')}</td>
+      <td>₹${myShare.toLocaleString('en-IN')}</td>
       <td><input class="adv-input" type="number" value="${adv}" min="0" inputmode="decimal"
         onchange="updateAdvance(${i},this.value)"
         onfocus="this.select()"
@@ -1663,12 +1683,8 @@ async function updateAdvance(idx,val){
   if(!trip||!(trip.travellers||[])[idx])return;
   trip.travellers[idx].advance=+val||0;
   await db.collection('trips').doc(activeTripId).update({travellers:trip.travellers});
-  const expSnap=await db.collection('expenses').where('tripId','==',activeTripId).get();
-  const exps=expSnap.docs.map(d=>d.data());
-  const totalSpent=exps.reduce((s,e)=>s+(+e.amount||0),0);
-  const perHead=(trip.travellers||[]).length?Math.round(totalSpent/(trip.travellers||[]).length):0;
   const d=await getAllData();
-  renderMemberTable(trip,perHead,d);
+  renderMemberTable(trip,0,d);
 }
 function renderExpList(exps,cid,canDelete){
   const el=document.getElementById(cid);if(!el)return;
@@ -1728,7 +1744,7 @@ function nt_calcDays(){
 async function openModal(id){
   if(id==='modal-new-trip'){
     const d=await getAllData();
-    const travs=d.users.filter(u=>u.role==='traveller'&&u.status==='active');
+    const travs=d.users.filter(u=>u.role==='traveller'&&u.status==='active'&&u.invitedBy===currentUser.id);
     const c=document.getElementById('nt-travellers-available');
     selectedTravellers=[];
     // Pre-select organiser as first traveller
@@ -1740,7 +1756,7 @@ async function openModal(id){
         <div><div style="font-size:0.88rem;font-weight:800;">${orgFullName()} (You — Organiser)</div></div>
         <span style="font-size:0.75rem;font-weight:700;color:var(--blue);margin-left:auto;">Always included</span>
       </div>`;
-    if(!travs.length){c.innerHTML=orgDiv+`<span style="font-size:0.8rem;color:var(--muted);font-weight:600;display:block;margin-top:8px;">No approved travellers yet. Share invite link!</span>`;}
+    if(!travs.length){c.innerHTML=orgDiv+`<div style="font-size:0.82rem;color:var(--muted);font-weight:600;padding:12px;background:var(--light);border-radius:10px;margin-top:8px;text-align:center;">No travellers have joined via your invite link yet.<br>Share your invite link first! 🔗</div>`;}
     else{c.innerHTML=orgDiv+travs.map(t=>`
       <div id="tsel-${t.id}" onclick="toggleTravellerSel('${t.id}','${t.firstName} ${t.lastName||''}')"
         style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--light);border:1.5px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px;transition:all 0.2s;">
@@ -1859,7 +1875,9 @@ async function renderTrvTrips(){
     const exps=d.expenses.filter(e=>e.tripId===t.id);
     const spent=exps.reduce((s,e)=>s+(+e.amount||0),0);
     const travellers=t.travellers||[];
-    const perHead=travellers.length?Math.round(spent/travellers.length):0;
+    const me=travellers.find(m=>m.userId===currentUser.id);
+    const shares=calcPersonShares(travellers,exps);
+    const myShare=me?shares[me.name]||0:0;
     return `<div class="trip-card-item" onclick="openTrvDetail('${t.id}')">
       <div class="tc-name">${t.name}</div>
       <div class="tc-dates">📅 ${fmt(t.start)} → ${fmt(t.end)}</div>
@@ -1868,7 +1886,7 @@ async function renderTrvTrips(){
         <span class="badge badge-green">👥 ${travellers.length} pax</span>
       </div>
       <div class="tc-bottom">
-        <span style="font-weight:900;color:var(--orange);font-size:0.9rem;">My share: ₹${perHead.toLocaleString('en-IN')}</span>
+        <span style="font-weight:900;color:var(--orange);font-size:0.9rem;">My share: ₹${myShare.toLocaleString('en-IN')}</span>
         <span class="badge badge-blue">View →</span>
       </div>
     </div>`;
@@ -1886,9 +1904,12 @@ async function renderTrvDetail(){
   const exps=d.expenses.filter(e=>e.tripId===activeTripId);
   const totalSpent=exps.reduce((s,e)=>s+(+e.amount||0),0);
   const travellers=trip.travellers||[];
-  const perHead=travellers.length?Math.round(totalSpent/travellers.length):0;
   const me=travellers.find(m=>m.userId===currentUser.id);
-  const adv=me?+me.advance||0:0,bal=perHead-adv;
+  const adv=me?+me.advance||0:0;
+  // Calculate my share based on splitAmong per expense
+  const shares=calcPersonShares(travellers,exps);
+  const myShare=me?shares[me.name]||0:0;
+  const bal=myShare-adv;
   document.getElementById('trv-detail-view').innerHTML=`
     <div class="back-btn" onclick="renderTrvTrips()">← Back to Trips</div>
     <div class="card">
@@ -1900,7 +1921,7 @@ async function renderTrvDetail(){
     </div>
     <div class="stats-row">
       <div class="stat-box"><div class="sv" style="color:var(--orange);">₹${totalSpent.toLocaleString('en-IN')}</div><div class="sl">Total Spent</div></div>
-      <div class="stat-box"><div class="sv" style="color:var(--blue);">₹${perHead.toLocaleString('en-IN')}</div><div class="sl">My Share</div></div>
+      <div class="stat-box"><div class="sv" style="color:var(--blue);">₹${myShare.toLocaleString('en-IN')}</div><div class="sl">My Share</div></div>
       <div class="stat-box"><div class="sv" style="color:var(--green);">₹${adv.toLocaleString('en-IN')}</div><div class="sl">My Advance</div></div>
       <div class="stat-box"><div class="sv" style="color:${bal>0?'var(--red)':'var(--green)'};">₹${Math.abs(bal).toLocaleString('en-IN')}</div><div class="sl">${bal>0?'I Owe':'Overpaid'}</div></div>
     </div>
@@ -1954,13 +1975,16 @@ async function generatePdf(tid){
   const catBgMap={hotel:'#ede9fe',fuel:'#dcfce7',food:'#fff7ed',transport:'#dbeafe',entry:'#fce7f3',shopping:'#fef9c3',misc:'#f1f5f9'};
   const catColMap={hotel:'#7c3aed',fuel:'#16a34a',food:'#ea580c',transport:'#2563eb',entry:'#db2777',shopping:'#ca8a04',misc:'#475569'};
 
+  const shares=calcPersonShares(travellers,exps);
   const travellerRows=travellers.map(m=>{
-    const adv=+m.advance||0,bal=perHead-adv;
+    const adv=+m.advance||0;
+    const myShare=shares[m.name]||0;
+    const bal=myShare-adv;
     const balStr=bal>0?`Owes ₹${bal.toLocaleString('en-IN')}`:(bal<0?`Overpaid ₹${Math.abs(bal).toLocaleString('en-IN')}`:'✓ Settled');
     const balCol=bal>0?'#ef4444':(bal<0?'#f97316':'#16a34a');
     return `<tr>
       <td>${m.name}</td>
-      <td>₹${perHead.toLocaleString('en-IN')}</td>
+      <td>₹${myShare.toLocaleString('en-IN')}</td>
       <td>₹${adv.toLocaleString('en-IN')}</td>
       <td style="color:${balCol};font-weight:800;">${balStr}</td>
     </tr>`;
