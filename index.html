@@ -1024,8 +1024,7 @@ async function restoreSession(){
     return true;
   }catch(e){return false;}
 }
-// Try restoring session on load
-restoreSession();
+// Try restoring session on load — called at bottom of script after all functions defined
 async function getAllData(){
   const [usersSnap,tripsSnap,expSnap,notesSnap]=await Promise.all([
     db.collection('users').get(),
@@ -1152,17 +1151,6 @@ async function sendAdminNotificationEmail(user){
 // ═══════════════════════════════════════════
 //  INVITE LINK CHECK
 // ═══════════════════════════════════════════
-(function(){
-  const params=new URLSearchParams(window.location.search);
-  if(params.has('invite')){
-    inviteOrgId=params.get('invite');
-    const r=document.getElementById('s-role');
-    if(r){r.value='traveller';r.disabled=true;}
-    document.getElementById('invite-notice').classList.add('show');
-    showScreen('screen-signup');
-  }
-})();
-
 // ═══════════════════════════════════════════
 //  SCREEN ROUTING
 // ═══════════════════════════════════════════
@@ -2062,6 +2050,24 @@ if('serviceWorker' in navigator){
       .catch(e=>console.log('SW error:',e));
   });
 }
+
+// ═══════════════════════════════════════════
+//  INIT — runs after all functions defined
+// ═══════════════════════════════════════════
+(function init(){
+  // 1. Check invite link — must run before restoreSession so signup screen shows
+  const params=new URLSearchParams(window.location.search);
+  if(params.has('invite')){
+    inviteOrgId=params.get('invite');
+    const r=document.getElementById('s-role');
+    if(r){r.value='traveller';r.disabled=true;}
+    document.getElementById('invite-notice').classList.add('show');
+    showScreen('screen-signup');
+    return; // Don't restore session if coming from invite link
+  }
+  // 2. Restore session on refresh
+  restoreSession();
+})();
 </script>
 </body>
 </html>
