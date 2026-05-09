@@ -2228,8 +2228,8 @@ window.addEventListener('appinstalled',()=>{
 // ═══════════════════════════════════════════
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js')
-      .then(()=>console.log('SW registered'))
+    navigator.serviceWorker.register('/TravelMate/sw.js', {scope: '/TravelMate/'})
+      .then(reg=>console.log('SW registered, scope:',reg.scope))
       .catch(e=>console.log('SW error:',e));
   });
 }
