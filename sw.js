@@ -1,49 +1,49 @@
-// TravelMate Service Worker v1.5
-const CACHE_NAME = 'travelmate-v5';
+// TravelMate Service Worker v2.0
+const CACHE_NAME = 'travelmate-v6';
 
-// Derive base path from SW location
-// On GitHub Pages: /TravelMate/sw.js → base = /TravelMate/
-// On custom domain: /sw.js → base = /
-const SW_PATH = self.location.pathname; // e.g. /TravelMate/sw.js
-const BASE = SW_PATH.substring(0, SW_PATH.lastIndexOf('/') + 1); // e.g. /TravelMate/
+// Auto-detect base path from SW location
+// GitHub Pages: /TravelMate/sw.js  → BASE = /TravelMate/
+// Custom domain: /sw.js            → BASE = /
+const BASE = self.location.pathname.replace(/sw\.js$/, '');
 
+// Only cache files we KNOW exist locally
 const ASSETS = [
+  BASE,                        // root path → serves index.html
   BASE + 'index.html',
   BASE + 'manifest.json',
-  BASE + 'logo.png'
+  BASE + 'sw.js'
+  // logo.png is a remote GitHub URL — not cached locally
 ];
 
-// Install — cache files using correct paths, skip silently if missing
+// Install — fetch and cache each asset, skip any that 404
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(cache =>
-      Promise.allSettled(
-        ASSETS.map(url =>
-          fetch(url).then(res => {
-            if (res.ok) return cache.put(url, res);
-          }).catch(() => {
-            // Silently skip — file may not exist (e.g. logo.png optional)
-          })
-        )
-      )
-    )
-  );
+  e.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await Promise.allSettled(
+      ASSETS.map(async url => {
+        try {
+          const res = await fetch(url, {cache: 'reload'});
+          if (res.ok) await cache.put(url, res);
+          else console.log('[SW] Skipped (not ok):', url, res.status);
+        } catch(err) {
+          console.log('[SW] Skipped (fetch failed):', url);
+        }
+      })
+    );
+  })());
   self.skipWaiting();
 });
 
-// Activate — remove old caches
+// Activate — wipe old caches
 self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
+  e.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)));
+    await self.clients.claim();
+  })());
 });
 
-// Fetch strategy:
-// - External (Firebase, CDN, fonts): always network, no caching
-// - Local files: cache-first, fallback to network
+// Fetch — network-first for external, cache-first for local
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   if (!e.request.url.startsWith('http')) return;
@@ -51,26 +51,29 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   const isExternal = url.hostname !== self.location.hostname;
 
-  if (isExternal) {
-    // Let external requests go straight to network — never cache Firebase/EmailJS
-    return;
-  }
+  // External requests (Firebase, EmailJS, fonts, CDN) → always network, never intercept
+  if (isExternal) return;
 
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(response => {
-        if (response && response.status === 200) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-        }
-        return response;
-      }).catch(() => {
-        // Offline fallback: serve index.html for navigation requests
-        if (e.request.mode === 'navigate') {
-          return caches.match(BASE + 'index.html');
-        
-      });
-    })
-  );
+  e.respondWith((async () => {
+    // Try cache first
+    const cached = await caches.match(e.request);
+    if (cached) return cached;
+
+    // Try network
+    try {
+      const res = await fetch(e.request);
+      if (res && res.status === 200) {
+        const cache = await caches.open(CACHE_NAME);
+        cache.put(e.request, res.clone());
+      }
+      return res;
+    } catch {
+      // Offline fallback — serve index.html for page navigations
+      if (e.request.mode === 'navigate') {
+        const fallback = await caches.match(BASE + 'index.html');
+        if (fallback) return fallback;
+      }
+      return new Response('Offline', {status: 503});
+    }
+  })());
 });
