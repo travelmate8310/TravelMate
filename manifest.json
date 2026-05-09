@@ -2,10 +2,10 @@
   "name": "TravelMate",
   "short_name": "TravelMate",
   "description": "Plan trips, split expenses, travel happy",
-  "start_url": "/TravelMate/index.html",
-  "scope": "/TravelMate/",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#f0f6ff",
+  "background_color": "#0f172a",
   "theme_color": "#3b82f6",
   "orientation": "portrait-primary",
   "icons": [
@@ -13,13 +13,13 @@
       "src": "https://raw.githubusercontent.com/travelmate8310/TravelMate/main/logo.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "https://raw.githubusercontent.com/travelmate8310/TravelMate/main/logo.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable"
     }
   ],
   "categories": ["travel", "finance", "utilities"],
