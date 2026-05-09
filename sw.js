@@ -69,7 +69,7 @@ self.addEventListener('fetch', e => {
         // Offline fallback: serve index.html for navigation requests
         if (e.request.mode === 'navigate') {
           return caches.match(BASE + 'index.html');
-        }
+        
       });
     })
   );
